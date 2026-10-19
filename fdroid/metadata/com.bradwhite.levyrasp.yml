@@ -1,0 +1,27 @@
+AntiFeatures:
+  - NonFreeNet
+Categories:
+  - Multimedia
+License: GPL-3.0-only
+AuthorName: LUC4N3X, Sidephone build by Brad White
+WebSite: https://levyra.dpdns.org/
+SourceCode: https://github.com/Bradleyw801/levyra-sp
+IssueTracker: https://github.com/Bradleyw801/levyra-sp/issues
+Name: Levyra SP
+Summary: Levyra music player with lighter defaults for the Sidephone
+Description: |
+  Levyra is an open-source music player that streams from YouTube Music, plays
+  your own files, saves tracks for offline listening and shows synced lyrics.
+  No account, no tracking.
+
+  Levyra SP is the same app built with first-run defaults suited to the
+  Sidephone SP-01's small screen and processor: the Performance engine on
+  Smooth, animations, Player Canvas, dynamic colour and Liquid Glass off, a
+  plain dark player, a compact home screen, and Levyra Enhanced Audio off so
+  playback can use the phone's hardware audio path. Every setting is still
+  there under Settings if you want it back.
+
+  It installs beside the regular Levyra. Pick a song or artist and choose
+  "Start radio" for an endless station built around it.
+
+RequiresRoot: false

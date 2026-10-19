@@ -1,0 +1,27 @@
+Categories:
+  - Games
+License: Proprietary
+AuthorName: Brad White
+WebSite: https://bradleyw801.github.io/sidephone-apps/
+Name: Slickrock Station
+Summary: Retro game launcher for RetroArch on phones with physical keys
+Description: |
+  Slickrock Station is a RetroArch front-end for phones with real keys: the
+  Sidephone SP-01 and its keypad tiles, and the Unihertz Titan 2 Elite.
+
+  RetroArch does the emulation. Slickrock Station does the two things RetroArch
+  is bad at on a small phone: finding a game quickly, and getting the physical
+  keys mapped sensibly for each console.
+
+  * A game library grouped by system, with box art and type-to-search
+  * A controls editor drawn on a picture of the phone's own keys, with a layout
+    per console for upright and sideways play
+  * One complete RetroArch configuration written per system, so switching
+    systems switches layout, overlay and core options in one go
+  * Autosave on exit, with resume or start over when you come back
+
+  Install "RetroArch for Slickrock" from this repository as well; Slickrock
+  Station launches it and keeps its settings separate from any other RetroArch
+  on the phone.
+
+RequiresRoot: false
