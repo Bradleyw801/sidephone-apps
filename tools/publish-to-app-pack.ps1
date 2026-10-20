@@ -1,5 +1,7 @@
-# Sends new Slickrock Station, RetroArch for Slickrock and Tyle builds to the Sidephone
-# app pack (github.com/Bradleyw801/sidephone-apps). Start it with PUBLISH-TO-APP-PACK.cmd.
+# Sends new Tyle builds to Brad White's apps (github.com/Bradleyw801/sidephone-apps).
+# Start it with PUBLISH-TO-APP-PACK.cmd. Slickrock Station and RetroArch for Slickrock are
+# not sent from here: the repository's workflow takes them from their GitHub releases
+# (github.com/Bradleyw801/slickrock-releases).
 #
 # It finds the newest APK of each app in its usual Downloads folder, skips anything the
 # pack already serves, asks before sending each new one, and waits until the pack has
@@ -27,11 +29,9 @@ try {
 if (-not $Downloads) { $Downloads = Join-Path $env:USERPROFILE 'Downloads' }
 if (-not $TokenFile) { $TokenFile = Join-Path (Join-Path $env:LOCALAPPDATA 'SidephoneAppPack') 'github-token.dat' }
 
+# A source with Patch = $true goes out with the .patch of the same name (for GPL apps).
 $Sources = @(
-    @{ App = 'Slickrock Station';       Package = 'com.bradwhite.slickrock';           Dir = @('Gaming & Emulation', 'TitanArch', 'Scripts & configs'); Pattern = 'Slickrock-*.apk' },
-    # RetroArch is GPL: each build goes out with its source patch, the .patch of the same name.
-    @{ App = 'RetroArch for Slickrock'; Package = 'com.bradwhite.slickrock.retroarch'; Dir = @('Gaming & Emulation', 'TitanArch', 'Scripts & configs'); Pattern = 'RetroArch-for-Slickrock*.apk'; Patch = $true },
-    @{ App = 'Tyle';                    Package = 'app.tileshift';                     Dir = @('Personal', 'Devices', 'Sidephone');                    Pattern = 'Tyle-*.apk' }
+    @{ App = 'Tyle'; Package = 'app.tileshift'; Dir = @('Personal', 'Devices', 'Sidephone'); Pattern = 'Tyle-*.apk' }
 )
 
 $TokenPage = 'https://github.com/settings/personal-access-tokens/new' +
