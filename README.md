@@ -71,6 +71,8 @@ fdroid/incoming/                  new builds waiting to be vetted (normally empt
 site/                             install page and QR code
 source/                           patches for the GPL apps carried here
 tools/intake.py                   vets new builds (run by the workflow)
+tools/PUBLISH-TO-APP-PACK.cmd     the PC publisher (copy of the one in Downloads\Personal\Devices\Sidephone)
+tools/publish-to-app-pack.ps1     what it runs
 .github/workflows/publish.yml     vets, builds the index and deploys GitHub Pages
 ```
 
