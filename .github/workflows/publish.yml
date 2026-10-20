@@ -1,0 +1,156 @@
+name: Publish repository
+
+# Builds the signed F-Droid index from the APKs in fdroid/repo and publishes it,
+# together with the install page, to GitHub Pages.
+#
+# Ways an APK gets in:
+#   1. Commit it straight into fdroid/repo/ (git push, or GitHub's "Upload files").
+#   2. Drop pieces of a large APK into fdroid/incoming/ as NAME.apk.part00, .part01, ...
+#      (split -b 9m). This job joins them, moves the APK into fdroid/repo/ and commits it.
+#   3. Levyra SP is pulled from the newest release of Bradleyw801/levyra-sp automatically.
+#
+# Secrets (Settings, Secrets and variables, Actions):
+#   FDROID_KEYSTORE_B64   base64 of fdroid/keystore.p12
+#   FDROID_KEYSTORE_PASS  keystore password
+#   FDROID_KEY_PASS       key password (same value)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "fdroid/**"
+      - "site/**"
+      - ".github/workflows/publish.yml"
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install fdroidserver
+        run: |
+          python -m venv "$HOME/fdroid-venv"
+          "$HOME/fdroid-venv/bin/pip" install --quiet --upgrade pip "setuptools<72" wheel
+          "$HOME/fdroid-venv/bin/pip" install --quiet fdroidserver
+          "$HOME/fdroid-venv/bin/fdroid" --version
+
+      - name: Join any split APKs and commit them
+        id: join
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          changed=0
+          for first in fdroid/incoming/*.part00; do
+            name="$(basename "${first%.part00}")"
+            parts=(fdroid/incoming/"$name".part*)
+            cat "${parts[@]}" > "fdroid/repo/$name"
+            rm -f "${parts[@]}"
+            echo "Joined ${#parts[@]} parts into fdroid/repo/$name"
+            changed=1
+          done
+          if [ "$changed" = "1" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A fdroid/repo fdroid/incoming
+            git commit -m "Add APKs joined from fdroid/incoming"
+            git push
+          fi
+
+      - name: Pull the newest Levyra SP release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url="$(gh release view --repo Bradleyw801/levyra-sp --json assets --jq '.assets[] | select(.name | endswith(".apk")) | .url' 2>/dev/null | head -n 1 || true)"
+          if [ -z "$url" ]; then
+            echo "No Levyra SP release yet; keeping whatever is in fdroid/repo."
+            exit 0
+          fi
+          name="$(basename "$url")"
+          if [ -f "fdroid/repo/$name" ]; then
+            echo "fdroid/repo/$name is already the newest release."
+            exit 0
+          fi
+          rm -f fdroid/repo/LevyraSP-*.apk
+          curl -fsSL -o "fdroid/repo/$name" "$url"
+          echo "Fetched $name"
+
+      - name: Restore the index signing key
+        env:
+          FDROID_KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$FDROID_KEYSTORE_B64"
+          printf '%s' "$FDROID_KEYSTORE_B64" | tr -d '\r\n' | base64 --decode > fdroid/keystore.p12
+
+      - name: Build the signed index
+        working-directory: fdroid
+        env:
+          FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+          FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
+        run: |
+          set -euo pipefail
+          "$HOME/fdroid-venv/bin/fdroid" update --pretty
+          rm -f keystore.p12
+          echo "Fingerprint of the signing key:"
+          "$HOME/fdroid-venv/bin/python" - <<'PY'
+          import json
+          d = json.load(open("repo/index-v2.json"))
+          print("  repo:", d["repo"]["address"])
+          for pkg, p in d["packages"].items():
+              v = next(iter(p["versions"].values()))["manifest"]
+              print("  ", pkg, v["versionName"], v["versionCode"])
+          PY
+
+      - name: Assemble the site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          cp -r site/. _site/
+          cp -r fdroid/repo _site/repo
+          cp -r source _site/source
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
