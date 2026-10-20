@@ -22,3 +22,6 @@ Description: |
   under Settings, Accessibility.
 
 RequiresRoot: false
+
+# Only builds signed with this key are published (SHA-256 of the signing certificate).
+AllowedAPKSigningKeys: 78041533114eeafa6d6fe9fa878a8602ec47d0779a9fb3a5a1fe1f600ce52382

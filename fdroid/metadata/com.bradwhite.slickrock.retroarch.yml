@@ -20,3 +20,6 @@ Description: |
   it: https://github.com/Bradleyw801/sidephone-apps
 
 RequiresRoot: false
+
+# Only builds signed with this key are published (SHA-256 of the signing certificate).
+AllowedAPKSigningKeys: 4a7f0c441b3188839e9583546619d0c913e755a25e82e6960679cb4f390688ce

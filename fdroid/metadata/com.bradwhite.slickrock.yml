@@ -25,3 +25,6 @@ Description: |
   on the phone.
 
 RequiresRoot: false
+
+# Only builds signed with this key are published (SHA-256 of the signing certificate).
+AllowedAPKSigningKeys: b4ebe2c5f742b870beae567cb25c46203c61a2f6519678556b6a4b3a3bed03fe
