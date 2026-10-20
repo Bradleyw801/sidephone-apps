@@ -89,7 +89,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -F "$RUNNER_TEMP/summary.txt"
-          git push
+          # Another build may have been sent while this ran. Then replay this commit on top of it
+          # (that build gets its own run).
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            git fetch origin main
+            git rebase FETCH_HEAD
+          done
+          echo "::error::Could not push the vetted APKs to main"
+          exit 1
 
       - name: Restore the index signing key
         env:
