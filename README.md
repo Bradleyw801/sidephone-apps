@@ -19,7 +19,6 @@ Install page and QR code: https://bradleyw801.github.io/sidephone-apps/
 | Slickrock Station | `com.bradwhite.slickrock` | Built in the Slickrock project, APK committed here |
 | RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | RetroArch 1.22.2 plus the patch in `source/`, APK committed here |
 | Tyle | `app.tileshift` | Built in the SidePhone project, APK committed here |
-| Levyra SP | `com.bradwhite.levyrasp` | Newest release of [Bradleyw801/levyra-sp](https://github.com/Bradleyw801/levyra-sp), pulled automatically |
 
 ## Publishing a new version
 
@@ -37,10 +36,9 @@ Install page and QR code: https://bradleyw801.github.io/sidephone-apps/
 2. Edit `fdroid/metadata/<package>.yml` if the description should change. The name,
    version and icon come from the APK and from `fdroid/metadata/<package>/en-US/icon.png`.
 3. Push. The "Publish repository" workflow signs a fresh index and deploys it with the
-   install page. It also runs once a day to pick up new Levyra SP releases.
+   install page.
 
-Phones that have the pack see the update in App Library within a day, or at once after
-a manual refresh.
+Phones that have the pack get the update on App Library's next refresh.
 
 ## Secrets and keys
 
@@ -69,5 +67,4 @@ source/                           patches for the GPL apps carried here
 ## Licences
 
 Slickrock Station and Tyle are Brad White's own apps and are not open source.
-RetroArch and Levyra are GPL-3.0; the modifications to the builds carried here are
-published in `source/` and in the Levyra SP repository.
+RetroArch is GPL-3.0; the changes in the build carried here are published in `source/`.
