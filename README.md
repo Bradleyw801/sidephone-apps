@@ -17,7 +17,7 @@ Install page and QR code: https://bradleyw801.github.io/sidephone-apps/
 | App | Package | Where the build comes from |
 | --- | --- | --- |
 | Slickrock Station | `com.bradwhite.slickrock` | Built in the Slickrock project, APK committed here |
-| RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | RetroArch 1.22.2 plus the patch in `source/`, APK committed here |
+| RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | Upstream RetroArch plus the patches in `source/`, APK committed here |
 | Tyle | `app.tileshift` | Built in the SidePhone project, APK committed here |
 
 ## Publishing a new version
@@ -25,10 +25,13 @@ Install page and QR code: https://bradleyw801.github.io/sidephone-apps/
 On Brad's PC, double-click `PUBLISH-TO-APP-PACK.cmd` in `Downloads\Personal\Devices\Sidephone`.
 It finds the newest Slickrock Station, RetroArch for Slickrock and Tyle builds in their
 usual folders, sends whatever the pack doesn't already serve, and waits until it is live.
+RetroArch is GPL, so a RetroArch build goes out with its source patch: the publisher sends
+the `.patch` of the same name from beside the APK (for example
+`retroarch-for-slickrock-1.22.2-sr2.patch`) into `source/`.
 
-Without it, put the APK in `fdroid/incoming/`, by `git push` or with "Add file, Upload
-files" on GitHub (up to 25 MB a file). Bigger files go in as pieces, which the workflow
-joins:
+Without it, put the APK in `fdroid/incoming/` (and a RetroArch build's patch in `source/`),
+by `git push` or with "Add file, Upload files" on GitHub (up to 25 MB a file). Bigger files
+go in as pieces, which the workflow joins:
 
 ```
 split -b 9000000 -d -a 2 Slickrock-10.45.apk Slickrock-10.45.apk.part
