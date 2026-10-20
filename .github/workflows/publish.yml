@@ -7,7 +7,6 @@ name: Publish repository
 #   1. Commit it straight into fdroid/repo/ (git push, or GitHub's "Upload files").
 #   2. Drop pieces of a large APK into fdroid/incoming/ as NAME.apk.part00, .part01, ...
 #      (split -b 9m). This job joins them, moves the APK into fdroid/repo/ and commits it.
-#   3. Levyra SP is pulled from the newest release of Bradleyw801/levyra-sp automatically.
 #
 # Secrets (Settings, Secrets and variables, Actions):
 #   FDROID_KEYSTORE_B64   base64 of fdroid/keystore.p12
@@ -20,9 +19,8 @@ on:
     paths:
       - "fdroid/**"
       - "site/**"
+      - "source/**"
       - ".github/workflows/publish.yml"
-  schedule:
-    - cron: "17 9 * * *"
   workflow_dispatch:
 
 permissions:
@@ -82,25 +80,6 @@ jobs:
             git commit -m "Add APKs joined from fdroid/incoming"
             git push
           fi
-
-      - name: Pull the newest Levyra SP release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          url="$(gh release view --repo Bradleyw801/levyra-sp --json assets --jq '.assets[] | select(.name | endswith(".apk")) | .url' 2>/dev/null | head -n 1 || true)"
-          if [ -z "$url" ]; then
-            echo "No Levyra SP release yet; keeping whatever is in fdroid/repo."
-            exit 0
-          fi
-          name="$(basename "$url")"
-          if [ -f "fdroid/repo/$name" ]; then
-            echo "fdroid/repo/$name is already the newest release."
-            exit 0
-          fi
-          rm -f fdroid/repo/LevyraSP-*.apk
-          curl -fsSL -o "fdroid/repo/$name" "$url"
-          echo "Fetched $name"
 
       - name: Restore the index signing key
         env:
