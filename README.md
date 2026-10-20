@@ -22,21 +22,27 @@ Install page and QR code: https://bradleyw801.github.io/sidephone-apps/
 
 ## Publishing a new version
 
-1. Put the new APK in `fdroid/repo/` and remove the old one. It must be signed with the
-   same key as the version already there, or phones will refuse the update. Any way of
-   getting the file into the repository works: `git push`, or "Add file, Upload files"
-   on GitHub. If an upload tool cannot take the whole file, split it and drop the pieces
-   in `fdroid/incoming/` instead:
+On Brad's PC, double-click `PUBLISH-TO-APP-PACK.cmd` in `Downloads\Personal\Devices\Sidephone`.
+It finds the newest Slickrock Station, RetroArch for Slickrock and Tyle builds in their
+usual folders, sends whatever the pack doesn't already serve, and waits until it is live.
 
-   ```
-   split -b 9m -d --additional-suffix= Slickrock-10.45.apk Slickrock-10.45.apk.part
-   ```
+Without it, put the APK in `fdroid/incoming/`, by `git push` or with "Add file, Upload
+files" on GitHub (up to 25 MB a file). Bigger files go in as pieces, which the workflow
+joins:
 
-   The workflow joins the pieces, moves the APK into `fdroid/repo/` and commits it.
-2. Edit `fdroid/metadata/<package>.yml` if the description should change. The name,
-   version and icon come from the APK and from `fdroid/metadata/<package>/en-US/icon.png`.
-3. Push. The "Publish repository" workflow signs a fresh index and deploys it with the
-   install page.
+```
+split -b 9000000 -d -a 2 Slickrock-10.45.apk Slickrock-10.45.apk.part
+```
+
+Either way the "Publish repository" workflow vets every new build before it goes out. It
+must be signed with the key pinned for that app in `fdroid/metadata/<package>.yml`
+(`AllowedAPKSigningKeys`) and have a higher version code than the published build. A build
+that passes replaces the old one, and the workflow signs a fresh index and deploys it with
+the install page. A build that fails is deleted and the run fails, with the reason on the
+run's page; everything else is still published.
+
+Edit `fdroid/metadata/<package>.yml` only if the description should change. The name,
+version and icon come from the APK and from `fdroid/metadata/<package>/en-US/icon.png`.
 
 Phones that have the pack get the update on App Library's next refresh.
 
@@ -58,10 +64,11 @@ fdroid/config.yml                 repository name, address, key settings (no sec
 fdroid/metadata/<package>.yml     name, summary, description, licence, links
 fdroid/metadata/<package>/en-US/icon.png
 fdroid/repo/*.apk                 the apps
-fdroid/incoming/                  split APK pieces waiting to be joined (normally empty)
+fdroid/incoming/                  new builds waiting to be vetted (normally empty)
 site/                             install page and QR code
 source/                           patches for the GPL apps carried here
-.github/workflows/publish.yml     builds the index and deploys GitHub Pages
+tools/intake.py                   vets new builds (run by the workflow)
+.github/workflows/publish.yml     vets, builds the index and deploys GitHub Pages
 ```
 
 ## Licences
