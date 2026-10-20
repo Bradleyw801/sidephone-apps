@@ -8,8 +8,8 @@ repo_url: https://bradleyw801.github.io/sidephone-apps/repo
 repo_name: Sidephone apps by Brad White
 repo_description: >-
   Apps for the Sidephone SP-01 published by Brad White: Slickrock Station and its
-  RetroArch build, Tyle, and Levyra SP. Add this repository to App Library (or any
-  F-Droid client) and the apps install and update from here.
+  RetroArch build, and Tyle. Add this repository to App Library (or any F-Droid
+  client) and the apps install and update from here.
 repo_icon: icon.png
 
 # No archive repo: the newest version of each app is what gets served.
