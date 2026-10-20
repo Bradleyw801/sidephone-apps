@@ -1,12 +1,14 @@
 name: Publish repository
 
-# Builds the signed F-Droid index from the APKs in fdroid/repo and publishes it,
-# together with the install page, to GitHub Pages.
+# Vets new APKs, builds the signed F-Droid index and publishes it, with the install page,
+# to GitHub Pages.
 #
-# Ways an APK gets in:
-#   1. Commit it straight into fdroid/repo/ (git push, or GitHub's "Upload files").
-#   2. Drop pieces of a large APK into fdroid/incoming/ as NAME.apk.part00, .part01, ...
-#      (split -b 9m). This job joins them, moves the APK into fdroid/repo/ and commits it.
+# New builds go into fdroid/incoming/, whole or as NAME.apk.part00, .part01, ...
+# (PUBLISH-TO-APP-PACK on Brad's PC sends them there; GitHub's "Upload files" works too).
+# tools/intake.py keeps the newest build of each app signed with the key pinned in its
+# metadata and removes the old one. Anything it refuses (wrong key, not newer, unknown
+# app) is deleted, everything else is still published, and the run then fails so the
+# refusal shows up.
 #
 # Secrets (Settings, Secrets and variables, Actions):
 #   FDROID_KEYSTORE_B64   base64 of fdroid/keystore.p12
@@ -20,6 +22,7 @@ on:
       - "fdroid/**"
       - "site/**"
       - "source/**"
+      - "tools/**"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
 
@@ -35,6 +38,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      refused: ${{ steps.vet.outputs.refused }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,27 +64,32 @@ jobs:
           "$HOME/fdroid-venv/bin/pip" install --quiet fdroidserver
           "$HOME/fdroid-venv/bin/fdroid" --version
 
-      - name: Join any split APKs and commit them
-        id: join
+      - name: Vet new APKs
+        id: vet
+        working-directory: fdroid
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          changed=0
-          for first in fdroid/incoming/*.part00; do
-            name="$(basename "${first%.part00}")"
-            parts=(fdroid/incoming/"$name".part*)
-            cat "${parts[@]}" > "fdroid/repo/$name"
-            rm -f "${parts[@]}"
-            echo "Joined ${#parts[@]} parts into fdroid/repo/$name"
-            changed=1
-          done
-          if [ "$changed" = "1" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A fdroid/repo fdroid/incoming
-            git commit -m "Add APKs joined from fdroid/incoming"
-            git push
+          mkdir -p incoming
+          export REFUSED_FILE="$RUNNER_TEMP/refused.txt" SUMMARY_FILE="$RUNNER_TEMP/summary.txt"
+          "$HOME/fdroid-venv/bin/python" ../tools/intake.py
+          {
+            echo "refused<<REFUSED_EOF"
+            cat "$REFUSED_FILE"
+            echo "REFUSED_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit the vetted APKs
+        run: |
+          set -euo pipefail
+          git add -A fdroid/repo fdroid/incoming
+          if git diff --cached --quiet; then
+            echo "No APK changes"
+            exit 0
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -F "$RUNNER_TEMP/summary.txt"
+          git push
 
       - name: Restore the index signing key
         env:
@@ -98,12 +108,11 @@ jobs:
           set -euo pipefail
           "$HOME/fdroid-venv/bin/fdroid" update --pretty
           rm -f keystore.p12
-          echo "Fingerprint of the signing key:"
           "$HOME/fdroid-venv/bin/python" - <<'PY'
           import json
           d = json.load(open("repo/index-v2.json"))
-          print("  repo:", d["repo"]["address"])
-          for pkg, p in d["packages"].items():
+          print("Serving from", d["repo"]["address"])
+          for pkg, p in sorted(d["packages"].items()):
               v = next(iter(p["versions"].values()))["manifest"]
               print("  ", pkg, v["versionName"], v["versionCode"])
           PY
@@ -133,3 +142,17 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  report:
+    needs: [build, deploy]
+    if: needs.build.outputs.refused != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report refused APKs
+        env:
+          REFUSED: ${{ needs.build.outputs.refused }}
+        run: |
+          printf '%s\n' "$REFUSED" | while IFS= read -r line; do
+            if [ -n "$line" ]; then echo "::error title=Not published::$line"; fi
+          done
+          exit 1
