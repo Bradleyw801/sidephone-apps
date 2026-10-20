@@ -1,15 +1,16 @@
 ---
-# Sidephone apps by Brad White: an F-Droid-format repository served from GitHub Pages.
+# Brad White's apps: an F-Droid-format repository served from GitHub Pages.
 # Secrets never live in this file. The index-signing keystore is restored from the
 # FDROID_KEYSTORE_B64 GitHub secret at build time and the passwords come from the
 # FDROID_KEYSTORE_PASS / FDROID_KEY_PASS secrets.
 
 repo_url: https://bradleyw801.github.io/sidephone-apps/repo
-repo_name: Sidephone apps by Brad White
+repo_name: Brad White's apps
 repo_description: >-
-  Apps for the Sidephone SP-01 published by Brad White: Slickrock Station and its
-  RetroArch build, and Tyle. Add this repository to App Library (or any F-Droid
-  client) and the apps install and update from here.
+  Apps by Brad White: Slickrock Station and the RetroArch build it launches, Tyle for
+  the Sidephone SP-01's keypad tiles, and Relay and Texts, which carry every text from
+  one phone to another. Add this repository to F-Droid, Droid-ify or the Sidephone's
+  App Library and the apps install and update from here.
 repo_icon: icon.png
 
 # No archive repo: the newest version of each app is what gets served.
