@@ -8,9 +8,11 @@ Name: RetroArch for Slickrock
 Summary: RetroArch built for Slickrock Station
 Description: |
   The RetroArch build that Slickrock Station launches. It is upstream RetroArch
-  (64-bit and 32-bit ARM) with a small set of patches for keypad phones, under
-  its own package name so it installs beside the stock RetroArch and keeps its
-  own settings.
+  with a small set of input patches, so every press reaches the game the moment
+  you make it, on keys, keypad tiles and controllers alike. It has its own
+  package name, so it installs beside the stock RetroArch and keeps its own
+  settings. This repository carries the 64-bit ARM build; Slickrock Station's
+  Setup fetches the 32-bit one for older devices.
 
   Install Slickrock Station from this repository too; it sets this RetroArch
   up for you.

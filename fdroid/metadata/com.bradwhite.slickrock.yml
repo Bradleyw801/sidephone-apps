@@ -2,27 +2,26 @@ Categories:
   - Games
 License: Proprietary
 AuthorName: Brad White
-WebSite: https://bradleyw801.github.io/sidephone-apps/
+WebSite: https://slickrock--bradwhite.apps.hedyassist.com/
 Name: Slickrock Station
-Summary: Retro game launcher for RetroArch on phones with physical keys
+Summary: Retro game launcher that sets up RetroArch for keys, controllers and touch
 Description: |
-  Slickrock Station is a RetroArch front-end for phones with real keys: the
-  Sidephone SP-01 and its keypad tiles, and the Unihertz Titan 2 Elite.
-
-  RetroArch does the emulation. Slickrock Station does the two things RetroArch
-  is bad at on a small phone: finding a game quickly, and getting the physical
-  keys mapped sensibly for each console.
+  Slickrock Station sets up RetroArch for you: cores, controls, overlays and
+  settings for each system, with a picture of the real controller while you map
+  it. It is built for keyboard phones such as the Unihertz Titan 2 Elite, phones
+  with built-in controls such as the Sidephone SP-01, Android TV with a gamepad,
+  and plain touchscreen phones.
 
   * A game library grouped by system, with box art and type-to-search
-  * A controls editor drawn on a picture of the phone's own keys, with a layout
-    per console for upright and sideways play
-  * One complete RetroArch configuration written per system, so switching
-    systems switches layout, overlay and core options in one go
+  * Controls drawn on the controller in your hands: a phone's keys or keypad
+    tile, a gamepad, or the touchscreen
+  * One complete RetroArch setup written per system, so each console gets its
+    own layout, overlay and core options
   * Autosave on exit, with resume or start over when you come back
 
-  Install "RetroArch for Slickrock" from this repository as well; Slickrock
-  Station launches it and keeps its settings separate from any other RetroArch
-  on the phone.
+  Install "RetroArch for Slickrock" from this repository as well. Slickrock
+  Station launches it, and it keeps its settings apart from any other
+  RetroArch on the device.
 
 RequiresRoot: false
 
