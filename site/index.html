@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sidephone apps by Brad White</title>
-<meta name="description" content="An App Pack for the Sidephone SP-01: Slickrock Station, RetroArch for Slickrock and Tyle. Scan the code in App Library to add it.">
+<title>Brad White's apps</title>
+<meta name="description" content="F-Droid repository for Brad White's apps: Slickrock Station, RetroArch for Slickrock, Tyle, Relay and Texts. Scan the code in F-Droid or App Library to add it.">
 <link rel="icon" href="repo/icons/icon.png">
 <style>
   :root {
@@ -33,7 +33,9 @@
   .apps { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
   .app { display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
   .app img { width: 56px; height: 56px; border-radius: 14px; background: #ddd; }
-  .app strong { display: block; font-size: 16px; }
+  .app strong { font-size: 16px; }
+  .app .where { display: block; color: var(--ink); font-size: 14px; margin-top: 2px; }
+  .app .dl { display: inline-block; margin-top: 8px; font-size: 14px; }
   .app .v { color: var(--muted); font-size: 13px; }
   .app p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
   a { color: var(--accent); }
@@ -43,21 +45,21 @@
 </head>
 <body>
 <main>
-  <h1>Sidephone apps</h1>
-  <p class="sub">Brad White's App Pack for the Sidephone SP-01. Scan once; the apps then install and update from App Library like the official packs.</p>
+  <h1>Brad White's apps</h1>
+  <p class="sub">Every app Brad White publishes, in one F-Droid repository. Scan once; the apps then install and update from F-Droid, Droid-ify or the Sidephone's App Library.</p>
 
   <figure class="qr" style="margin:0">
-    <img src="qr.png" width="636" height="636" alt="QR code that adds this App Pack to App Library">
-    <figcaption>Scan with App Library on the Sidephone, or with any F-Droid client.</figcaption>
+    <img src="qr.png" width="636" height="636" alt="QR code that adds this repository to an F-Droid client">
+    <figcaption>Scan with F-Droid, Droid-ify, or App Library on the Sidephone.</figcaption>
   </figure>
 
-  <h2>Add the pack</h2>
+  <h2>Add the repository</h2>
   <ol>
-    <li>On the Sidephone, open <strong>App Library</strong> and tap the QR code button. If there is no button, go to <strong>Settings, Repositories</strong>, tap <strong>+</strong>, then <strong>Scan QR code</strong>.</li>
-    <li>Scan the code above. Adding the pack installs nothing on its own.</li>
-    <li>Find the app you want in App Library and tap <strong>Install</strong>. Updates arrive the same way.</li>
+    <li>In F-Droid, go to <strong>Settings, Repositories</strong>, tap <strong>+</strong>, then <strong>Scan QR code</strong>. On the Sidephone, open <strong>App Library</strong> and tap its QR code button.</li>
+    <li>Scan the code above. Adding the repository installs nothing on its own.</li>
+    <li>Find the app you want and tap <strong>Install</strong>. Updates arrive the same way.</li>
   </ol>
-  <p class="note">Any F-Droid client works too: Settings, Repositories, add the address below, then paste the fingerprint.</p>
+  <p class="note">On the phone itself, where the code can't be scanned: add the address below by hand and paste the fingerprint.</p>
 
   <h2>Manual address</h2>
   <dl class="kv">
@@ -65,26 +67,45 @@
     <dt>Fingerprint</dt><dd class="mono">297A48B6E4BE5C0701771CE758E54D7885C3E342FFC46FE28247FA5038E1DAC6</dd>
   </dl>
 
-  <h2>What is in it</h2>
+  <h2>The apps</h2>
   <ul class="apps">
     <li class="app" data-pkg="com.bradwhite.slickrock">
       <img src="repo/com.bradwhite.slickrock/en-US/icon.png" alt="">
       <div><strong>Slickrock Station</strong><span class="v"></span>
-      <p>Retro game launcher for RetroArch, built for phones with real keys. Library by system with box art, and a controls editor drawn on the phone's own keys.</p></div>
+      <p>Sets up RetroArch for you: a game library by system with box art, and controls drawn on the controller in your hands, whether keys, a keypad tile, a gamepad or the touchscreen.</p>
+      <a class="dl" href="slickrock.apk">Download the APK directly</a></div>
     </li>
     <li class="app" data-pkg="com.bradwhite.slickrock.retroarch">
       <img src="repo/com.bradwhite.slickrock.retroarch/en-US/icon.png" alt="">
       <div><strong>RetroArch for Slickrock</strong><span class="v"></span>
-      <p>The RetroArch build Slickrock Station launches. Installs beside the stock RetroArch and keeps its own settings. GPL; the <a href="https://github.com/Bradleyw801/sidephone-apps/tree/main/source">patches</a> are published here.</p></div>
+      <p>The RetroArch build Slickrock Station launches: every press reaches the game the moment you make it. Installs beside the stock RetroArch and keeps its own settings. GPL; the <a href="https://github.com/Bradleyw801/sidephone-apps/tree/main/source">patches</a> are published here.</p>
+      <a class="dl" href="retroarch.apk">Download the APK directly</a></div>
     </li>
     <li class="app" data-pkg="app.tileshift">
       <img src="repo/app.tileshift/en-US/icon.png" alt="">
       <div><strong>Tyle</strong><span class="v"></span>
-      <p>Per-tile settings for the keypad tiles: keyboard, Bluetooth, brightness and an app to open when a tile snaps on. Turn on "Tyle keys" under Accessibility after installing.</p></div>
+      <span class="where">For the Sidephone SP-01</span>
+      <p>Per-tile settings for the keypad tiles: keyboard, Bluetooth, brightness and an app to open when a tile snaps on. Turn on "Tyle keys" under Accessibility after installing.</p>
+      <a class="dl" href="tileshift.apk">Download the APK directly</a></div>
+    </li>
+    <li class="app" data-pkg="com.textrelay.relay">
+      <img src="repo/com.textrelay.relay/en-US/icon.png" alt="">
+      <div><strong>Relay</strong><span class="v"></span>
+      <span class="where">On the phone that keeps your SIM and Google Messages</span>
+      <p>Forwards every text, SMS, MMS and RCS, groups and full-size pictures included, to your Text Relay inbox, and sends your replies back out through Messages from that number. Leave it on Wi-Fi and a charger.</p>
+      <a class="dl" href="relay.apk">Download the APK directly</a></div>
+    </li>
+    <li class="app" data-pkg="com.textrelay.texts">
+      <img src="repo/com.textrelay.texts/en-US/icon.png" alt="">
+      <div><strong>Texts</strong><span class="v"></span>
+      <span class="where">On the phone you carry</span>
+      <p>Reads and answers every conversation the relay phone receives, with a notification for each one as texts arrive. Works with no Google services, push app or browser.</p>
+      <a class="dl" href="texts.apk">Download the APK directly</a></div>
     </li>
   </ul>
+  <p class="note" style="margin-top:12px">Relay and Texts pair with a one-time code made in the other: in Texts, <strong>Settings, Pair the relay device</strong>; in Relay, <strong>Pair a phone with Texts</strong>. Scan its QR code with the new phone's camera, or type the code. A direct download installs the same build F-Droid serves; Android asks once to allow installs from your browser, and on phones with Google Play, Play Protect may ask you to confirm with <strong>More details, Install anyway</strong>.</p>
 
-  <p class="note" style="margin-top:28px">Published from <a href="https://github.com/Bradleyw801/sidephone-apps">github.com/Bradleyw801/sidephone-apps</a>. Slickrock Station and Tyle are Brad White's own apps. RetroArch is free software under the GNU GPL; this pack carries a build of it, with the changes published alongside.</p>
+  <p class="note" style="margin-top:28px">Published from <a href="https://github.com/Bradleyw801/sidephone-apps">github.com/Bradleyw801/sidephone-apps</a>. Slickrock Station, Tyle, Relay and Texts are Brad White's own apps. RetroArch is free software under the GNU GPL; this repository carries a build of it, with the changes published alongside.</p>
 </main>
 <script>
   fetch('repo/index-v2.json').then(r => r.json()).then(d => {
