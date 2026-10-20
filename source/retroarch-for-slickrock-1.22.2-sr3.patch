@@ -1,0 +1,2037 @@
+diff --git a/frontend/drivers/platform_unix.c b/frontend/drivers/platform_unix.c
+index e4ffe0f..2658332 100644
+--- a/frontend/drivers/platform_unix.c
++++ b/frontend/drivers/platform_unix.c
+@@ -205,6 +205,8 @@ int system_property_get(const char *command,
+ #ifdef ANDROID
+ /* forward declaration */
+ bool android_run_events(void *data);
++/* Slickrock: input/drivers/android_input.c, the input reader */
++void android_input_reader_release(void);
+ 
+ void android_app_write_cmd(struct android_app *android_app, int8_t cmd)
+ {
+@@ -2032,8 +2034,8 @@ static void android_app_destroy(struct android_app *android_app)
+       retro_vfs_deinit_saf();
+ #endif
+ 
+-   if (android_app->inputQueue)
+-      AInputQueue_detachLooper(android_app->inputQueue);
++   /* Slickrock: the queue belongs to the input reader */
++   android_input_reader_release();
+ 
+    AConfiguration_delete(android_app->config);
+    android_app->destroyed = 1;
+diff --git a/input/drivers/android_input.c b/input/drivers/android_input.c
+index 1e475bd..6479639 100644
+--- a/input/drivers/android_input.c
++++ b/input/drivers/android_input.c
+@@ -18,8 +18,14 @@
+ 
+ #include <unistd.h>
+ #include <dlfcn.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <time.h>
+ 
+ #include <android/keycodes.h>
++#include <android/log.h>
+ 
+ #include <dynamic/dylib.h>
+ #include <retro_inline.h>
+@@ -149,7 +155,7 @@ typedef struct android_input
+    int mouse_x, mouse_y;
+    int16_t mouse_x_viewport_screen, mouse_y_viewport_screen;
+    int16_t mouse_x_viewport, mouse_y_viewport;
+-   int mouse_x_delta, mouse_y_delta;
++   float mouse_x_delta, mouse_y_delta; /* Slickrock: a poll's moves summed */
+    int mouse_l, mouse_r, mouse_m, mouse_wu, mouse_wd;
+    bool mouse_activated;
+    unsigned pads_connected;
+@@ -164,13 +170,50 @@ typedef struct android_input
+ static void frontend_android_get_version_sdk(int32_t *sdk);
+ static void frontend_android_get_name(char *s, size_t len);
+ 
++/* Slickrock: a copy of one input event, taken by the reader thread
++ * (see "input reader" below) so the event can be finished at once. It
++ * holds every field the handlers in this file read. */
++#define SR_POINTERS MAX_TOUCH
++
++enum sr_axis
++{
++   SR_AXIS_X = 0,
++   SR_AXIS_Y,
++   SR_AXIS_Z,
++   SR_AXIS_RZ,
++   SR_AXIS_HAT_X,
++   SR_AXIS_HAT_Y,
++   SR_AXIS_LTRIGGER,
++   SR_AXIS_RTRIGGER,
++   SR_AXIS_BRAKE,
++   SR_AXIS_GAS,
++   SR_AXIS_VSCROLL,
++   SR_AXIS_RELATIVE_X,
++   SR_AXIS_RELATIVE_Y,
++   SR_AXIS_COUNT
++};
++
++typedef struct sr_event
++{
++   int64_t event_time;
++   int64_t down_time;
++   int32_t type;
++   int32_t device_id;
++   int32_t source;
++   int32_t action;        /* key action, or the motion action as reported */
++   int32_t keycode;
++   int32_t meta_state;
++   int32_t button_state;
++   int32_t pointer_count; /* pointers copied, at most SR_POINTERS */
++   int32_t pointer_id[SR_POINTERS];
++   float   x[SR_POINTERS];
++   float   y[SR_POINTERS];
++   float   axis[SR_AXIS_COUNT]; /* at the pointer the action names */
++} sr_event_t;
++
+ bool (*engine_lookup_name)(char *buf,
+       int *vendorId, int *productId, size_t len, int id);
+-void (*engine_handle_dpad)(struct android_app *, AInputEvent*, int, int);
+-
+-static void android_input_poll_input_gingerbread(android_input_t *android);
+-static void android_input_poll_input_default(android_input_t *android);
+-static void (*android_input_poll_input)(android_input_t *android);
++void (*engine_handle_dpad)(struct android_app *, const sr_event_t*, int, int);
+ 
+ static bool android_input_set_sensor_state(void *data, unsigned port,
+       enum retro_sensor_action action, unsigned event_rate);
+@@ -363,6 +406,862 @@ bool android_input_can_be_keyboard(void *data, int port)
+     return android_input_can_be_keyboard_jni(device->id);
+ }
+ 
++/* Slickrock: input reader.
++ *
++ * Android hands a window one key event at a time and holds the next one
++ * until the window has finished the last (InputDispatcher: key events are
++ * serialized "with respect to all prior input events"). Stock 1.22.2 reads
++ * the input queue on the main thread once a frame, and a NativeActivity is
++ * handed every key twice: before the IME, marked AKEY_EVENT_FLAG_PREDISPATCH
++ * (0x20000000, frameworks/native Input.h), and again after the IME unless
++ * the first copy is finished handled. Stock finished the first copy
++ * unhandled, so every key cost two frames and an IME round trip before
++ * Android would send the next. Under mashing the dispatcher's queue grew
++ * without bound: on a Sidephone SP01, 97 keys waiting, the oldest 3.2 s,
++ * draining at 28 a second, and the game played presses back long after the
++ * hands had stopped.
++ *
++ * Here a thread of its own owns the queue. It copies each event and
++ * finishes it at once, handled, so Android sends the next one straight
++ * away, and neither the IME nor the second copy ever happens. Volume keys
++ * stay the system's: finished unhandled, and read once, on their way back
++ * from the IME. Keyboard keys reach RetroArch a frame sooner than in
++ * stock, which applied them only after the IME.
++ *
++ * The main thread applies the copies at every poll, oldest first, through
++ * the stock handlers. With nothing holding the next key back, a press can
++ * now begin and end between two polls, which stock never allowed; the
++ * drain therefore stops at the second change of a key, a touch pointer or
++ * a mouse button within one poll (see "one change per poll" below).
++ *
++ * If the thread cannot start, the input driver does not start either, and
++ * RetroArch reports that and exits. There is no second path. */
++#ifndef SLICKROCK_AKEY_EVENT_FLAG_PREDISPATCH
++#define SLICKROCK_AKEY_EVENT_FLAG_PREDISPATCH 0x20000000
++#endif
++
++#define SR_RING 2048 /* events; a power of two */
++
++typedef struct sr_reader
++{
++   slock_t     *lock;     /* guards queue, head, tail, dropped, ring */
++   scond_t     *cond;
++   sthread_t   *thread;
++   ALooper     *looper;   /* the reader thread's own */
++   AInputQueue *queue;    /* the queue being read, or NULL */
++   int          wake[2];  /* reader to main thread, LOOPER_ID_INPUT */
++   bool         ready;
++   bool         running;  /* thread up, its knock on the main looper */
++   unsigned     head;
++   unsigned     tail;
++   unsigned     dropped;
++   sr_event_t   ring[SR_RING];
++} sr_reader_t;
++
++static sr_reader_t sr_reader = { NULL, NULL, NULL, NULL, NULL, { -1, -1 } };
++
++/* The macros near the top route these two through pointers that the input
++ * driver fills in; the reader runs whether or not a driver exists, and the
++ * platform has had both since API 14. */
++#pragma push_macro("AMotionEvent_getAxisValue")
++#pragma push_macro("AMotionEvent_getButtonState")
++#undef AMotionEvent_getAxisValue
++#undef AMotionEvent_getButtonState
++static void sr_copy_motion(const AInputEvent *event, sr_event_t *e)
++{
++   size_t i;
++   size_t ptr;
++   size_t count     = AMotionEvent_getPointerCount(event);
++
++   e->action        = AMotionEvent_getAction(event);
++   e->button_state  = AMotionEvent_getButtonState(event);
++   e->event_time    = AMotionEvent_getEventTime(event);
++   e->down_time     = AMotionEvent_getDownTime(event);
++
++   if (count > SR_POINTERS)
++      count         = SR_POINTERS;
++   e->pointer_count = (int32_t)count;
++
++   for (i = 0; i < count; i++)
++   {
++      e->pointer_id[i] = AMotionEvent_getPointerId(event, i);
++      e->x[i]          = AMotionEvent_getX(event, i);
++      e->y[i]          = AMotionEvent_getY(event, i);
++   }
++
++   /* the handlers read the axes at the pointer the action names */
++   ptr = (size_t)e->action >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
++   if (ptr < count)
++   {
++      e->axis[SR_AXIS_X]          = AMotionEvent_getAxisValue(event, AXIS_X, ptr);
++      e->axis[SR_AXIS_Y]          = AMotionEvent_getAxisValue(event, AXIS_Y, ptr);
++      e->axis[SR_AXIS_Z]          = AMotionEvent_getAxisValue(event, AXIS_Z, ptr);
++      e->axis[SR_AXIS_RZ]         = AMotionEvent_getAxisValue(event, AXIS_RZ, ptr);
++      e->axis[SR_AXIS_HAT_X]      = AMotionEvent_getAxisValue(event, AXIS_HAT_X, ptr);
++      e->axis[SR_AXIS_HAT_Y]      = AMotionEvent_getAxisValue(event, AXIS_HAT_Y, ptr);
++      e->axis[SR_AXIS_LTRIGGER]   = AMotionEvent_getAxisValue(event, AXIS_LTRIGGER, ptr);
++      e->axis[SR_AXIS_RTRIGGER]   = AMotionEvent_getAxisValue(event, AXIS_RTRIGGER, ptr);
++      e->axis[SR_AXIS_BRAKE]      = AMotionEvent_getAxisValue(event, AXIS_BRAKE, ptr);
++      e->axis[SR_AXIS_GAS]        = AMotionEvent_getAxisValue(event, AXIS_GAS, ptr);
++      e->axis[SR_AXIS_VSCROLL]    = AMotionEvent_getAxisValue(event,
++            AMOTION_EVENT_AXIS_VSCROLL, ptr);
++      e->axis[SR_AXIS_RELATIVE_X] = AMotionEvent_getAxisValue(event,
++            AMOTION_EVENT_AXIS_RELATIVE_X, ptr);
++      e->axis[SR_AXIS_RELATIVE_Y] = AMotionEvent_getAxisValue(event,
++            AMOTION_EVENT_AXIS_RELATIVE_Y, ptr);
++   }
++}
++#pragma pop_macro("AMotionEvent_getButtonState")
++#pragma pop_macro("AMotionEvent_getAxisValue")
++
++/* A stick, trigger or hat move: the motion events the stock poll hands to
++ * engine_handle_dpad, which only stores the latest axis values. */
++static bool sr_is_stick_move(const sr_event_t *e)
++{
++   return e->type == AINPUT_EVENT_TYPE_MOTION
++      && !(e->source & (AINPUT_SOURCE_TOUCHPAD | AINPUT_SOURCE_TOUCHSCREEN
++               | AINPUT_SOURCE_MOUSE_RELATIVE | AINPUT_SOURCE_STYLUS
++               | AINPUT_SOURCE_MOUSE))
++      && (e->action & AMOTION_EVENT_ACTION_MASK) == AMOTION_EVENT_ACTION_MOVE;
++}
++
++/* Under sr_reader.lock. */
++static void sr_ring_put(const sr_event_t *e)
++{
++   /* A stick move still waiting from the same device would only have its
++    * values replaced by this one, so this one takes its place. */
++   if (sr_reader.head != sr_reader.tail && sr_is_stick_move(e))
++   {
++      sr_event_t *last = &sr_reader.ring[(sr_reader.head - 1) & (SR_RING - 1)];
++      if (     sr_is_stick_move(last)
++            && last->device_id == e->device_id
++            && last->source    == e->source)
++      {
++         *last = *e;
++         return;
++      }
++   }
++
++   /* full only if the main thread has not polled for a long time */
++   if (sr_reader.head - sr_reader.tail == SR_RING)
++   {
++      sr_reader.tail++;
++      sr_reader.dropped++;
++   }
++
++   sr_reader.ring[sr_reader.head & (SR_RING - 1)] = *e;
++   sr_reader.head++;
++}
++
++/* Slickrock: Sidephone SP01 Mini Controller ghost filter.
++ *
++ * The phone scans its keypad tiles through one controller,
++ * "gxa535_keyboard". The Mini Controller's ten buttons sit on a 3 by 4
++ * grid of shared lines with no diodes, so three held buttons that form an
++ * L join the lines of a fourth, and the controller reports that fourth
++ * button as pressed. The grid below was worked out from raw evdev
++ * captures on an SP01 (Oct 2026). It accounts for every Start and Select
++ * the controller reported while nobody touched them. A ghost runs through
++ * three contacts in series, so a predicted ghost sometimes flickers or
++ * fails to show, as observed.
++ *
++ *        col 0    col 1    col 2    col 3
++ * row 0  B        A        X        Start
++ * row 1  Y        -        Down     Left
++ * row 2  Select   -        Right    Up
++ *
++ * (Android key codes: Start is BUTTON_START 108, printed Select on the
++ * tile; Select is BUTTON_SELECT 109, printed Start. BUTTON_B is the tile's
++ * BTN_EAST, BUTTON_A BTN_SOUTH, BUTTON_X BTN_NORTH, BUTTON_Y BTN_WEST.)
++ *
++ * A is alone in column 1, so it can neither be a ghost nor complete an L:
++ * it is not filtered. A release is never a ghost either (a ghost closes a
++ * path, it never opens a real one), so a key that was passed on is let go
++ * the moment its release arrives. Only presses of the other nine are
++ * judged.
++ *
++ * The controller reports a scan's changes in a fixed order, row 0 first
++ * (A, Start, X, B, then Left, Down, Y, then Up, Right, Select), so a ghost
++ * can come before the key that makes it. A scan is gathered until the
++ * keypad has been quiet for SR_KP_QUIET_NS and judged whole. That holds
++ * only while one scan's events reach the reader less than SR_KP_QUIET_NS
++ * apart; nobody has measured that gap on the phone. A key the other held
++ * keys explain is a ghost and is held back. It goes on late only if it
++ * stays unexplained for SR_KP_LATE_NS; in the recordings no ghost outlived
++ * the key that made it. When new keys explain each other, the likeliest
++ * are taken as real: a key pressed in the last SR_KP_RECENT_NS first (that
++ * is the one being mashed), then a d-pad direction before a face button,
++ * Start and Select last.
++ *
++ * A ghost can also run a whole scan ahead of its cause: a contact that
++ * closes after its own row was read but before the ghost's row shows as
++ * the ghost first and as itself one scan (about 28 ms) later. Only a ghost
++ * in a later row than its cause can do that; the two in the recordings
++ * were both Select (row 2), caused from row 0, 28 and 30 ms ahead. So
++ * Select arriving with two other keys down waits SR_KP_LATE_NS, one scan
++ * and a margin, for a third before it is believed. Start, in row 0, is
++ * read first and never runs ahead.
++ *
++ * RetroArch blocks every game button while its hotkey enable (Start 108
++ * on this tile) is held longer than input_hotkey_block_delay, and Select
++ * 109 pauses most games, so Start and Select under a chord of three or
++ * more other keys, which nobody presses in a game, wait out the chord and
++ * go on late if they are still held after. */
++#define SR_KP_KEYS       9
++#define SR_KP_SCAN_NS    5000000LL /* one scan's events, by event time */
++#define SR_KP_QUIET_NS   5000000LL /* scans are about 28 ms apart */
++#define SR_KP_LATE_NS   40000000LL /* one scan (about 30 ms) and a margin */
++#define SR_KP_RECENT_NS 500000000LL
++#define SR_KP_SLOTS      2         /* the tile, and any app's copy of it */
++#define SR_KP_KNOWN      16
++
++static const int32_t sr_kp_code[SR_KP_KEYS] = {
++   AKEYCODE_BUTTON_B,      AKEYCODE_BUTTON_X,  AKEYCODE_BUTTON_START,
++   AKEYCODE_BUTTON_Y,      AKEYCODE_DPAD_DOWN, AKEYCODE_DPAD_LEFT,
++   AKEYCODE_BUTTON_SELECT, AKEYCODE_DPAD_RIGHT, AKEYCODE_DPAD_UP };
++static const uint8_t sr_kp_row[SR_KP_KEYS]  = { 0, 0, 0, 1, 1, 1, 2, 2, 2 };
++static const uint8_t sr_kp_col[SR_KP_KEYS]  = { 0, 2, 3, 0, 2, 3, 0, 2, 3 };
++/* what it costs to call a key real: d-pad 1, face 2, Start/Select 9 */
++static const uint8_t sr_kp_cost[SR_KP_KEYS] = { 2, 2, 9, 2, 1, 1, 9, 1, 1 };
++static const char *sr_kp_name[SR_KP_KEYS] = {
++   "B", "X", "Start", "Y", "Down", "Left", "Select", "Right", "Up" };
++#define SR_KP_MENU  ((uint16_t)((1 << 2) | (1 << 6))) /* Start, Select */
++#define SR_KP_AHEAD ((uint16_t)(1 << 6))              /* Select: row 2 */
++
++typedef struct sr_keypad
++{
++   int32_t    device_id;
++   bool       used;
++   uint16_t   raw;              /* keys the controller reports held */
++   uint16_t   live;             /* keys passed on as held */
++   uint16_t   held_back;        /* dropped since the last log line */
++   int        scan_n;           /* events of the scan being gathered */
++   int64_t    scan_time;        /* event time of its first event */
++   int64_t    last_arrival;
++   sr_event_t scan[SR_KP_KEYS * 2];
++   sr_event_t down[SR_KP_KEYS]; /* each key's last DOWN */
++   int64_t    late_since[SR_KP_KEYS];
++   int64_t    prev_down[SR_KP_KEYS]; /* event time of the DOWN before it */
++   unsigned   ghosts;
++} sr_keypad_t;
++
++/* reader thread only */
++static sr_keypad_t sr_keypads[SR_KP_SLOTS];
++static struct { int32_t id; int8_t is; } sr_kp_known[SR_KP_KNOWN];
++static int sr_kp_known_n = 0;
++
++static int64_t sr_now_ns(void)
++{
++   struct timespec ts;
++   clock_gettime(CLOCK_MONOTONIC, &ts);
++   return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
++}
++
++static int sr_kp_index(int32_t keycode)
++{
++   int i;
++   for (i = 0; i < SR_KP_KEYS; i++)
++      if (sr_kp_code[i] == keycode)
++         return i;
++   return -1;
++}
++
++/* The device's name comes over JNI, once per device id. */
++static bool sr_kp_is_keypad(int32_t device_id)
++{
++   int i;
++   char name[256];
++   int vid = 0, pid = 0;
++   bool is = false;
++   JNIEnv *env;
++
++   for (i = 0; i < sr_kp_known_n; i++)
++      if (sr_kp_known[i].id == device_id)
++         return sr_kp_known[i].is != 0;
++
++   name[0] = '\0';
++   if ((env = (JNIEnv*)jni_thread_getenv())
++         && (*env)->PushLocalFrame(env, 16) == 0)
++   {
++      if (android_input_lookup_name(name, &vid, &pid,
++               sizeof(name), device_id))
++         is = string_is_equal(name, "gxa535_keyboard");
++      (*env)->PopLocalFrame(env, NULL);
++   }
++
++   if (sr_kp_known_n < SR_KP_KNOWN)
++   {
++      sr_kp_known[sr_kp_known_n].id   = device_id;
++      sr_kp_known[sr_kp_known_n++].is = is ? 1 : 0;
++   }
++   return is;
++}
++
++/* Every key whose row and column the held keys join. */
++static uint16_t sr_kp_closure(uint16_t held)
++{
++   uint8_t rows[SR_KP_KEYS], cols[SR_KP_KEYS];
++   uint16_t out = 0;
++   int n = 0, i, a, b, merged;
++
++   for (i = 0; i < SR_KP_KEYS; i++)
++      if (held >> i & 1)
++      {
++         rows[n] = (uint8_t)(1 << sr_kp_row[i]);
++         cols[n] = (uint8_t)(1 << sr_kp_col[i]);
++         n++;
++      }
++
++   do
++   {
++      merged = 0;
++      for (a = 0; a < n; a++)
++         for (b = a + 1; b < n; b++)
++            if ((rows[a] & rows[b]) || (cols[a] & cols[b]))
++            {
++               rows[a] |= rows[b];
++               cols[a] |= cols[b];
++               rows[b]  = rows[n - 1];
++               cols[b]  = cols[n - 1];
++               n--;
++               b--;
++               merged   = 1;
++            }
++   } while (merged);
++
++   for (i = 0; i < SR_KP_KEYS; i++)
++      for (a = 0; a < n; a++)
++         if ((rows[a] >> sr_kp_row[i] & 1) && (cols[a] >> sr_kp_col[i] & 1))
++            out |= (uint16_t)(1 << i);
++   return out;
++}
++
++static void sr_kp_emit(const sr_event_t *e, int32_t action)
++{
++   sr_event_t out = *e;
++   out.action     = action;
++   sr_ring_put(&out);
++}
++
++/* Under sr_reader.lock. Picks the held keys that are real. 'fresh' holds
++ * the keys that went down in this scan; the others waiting were held
++ * back before and only go on late. */
++static void sr_kp_settle(sr_keypad_t *kp, uint16_t fresh, int64_t now)
++{
++   const uint16_t menu = SR_KP_MENU;
++   uint16_t wait  = kp->raw & ~kp->live;
++   uint16_t need  = kp->raw;
++   uint16_t best  = 0;
++   int best_cost  = -1;
++   int others     = __builtin_popcount(kp->raw & ~menu);
++   unsigned sub;
++   int i;
++
++   /* Start or Select under a chord of three or more is not a press anyone
++    * makes in a game; it waits out the chord and goes on late if it is
++    * still held after. */
++   if (others >= 3)
++   {
++      need &= ~menu;
++      wait &= ~menu;
++      for (i = 0; i < SR_KP_KEYS; i++)
++      {
++         uint16_t bit = (uint16_t)(1 << i);
++         if (!(menu & bit))
++            continue;
++         if ((kp->raw & bit) && (fresh & bit || kp->late_since[i]))
++         {
++            kp->ghosts++;
++            kp->held_back |= bit;
++         }
++         kp->late_since[i] = 0;
++      }
++   }
++   /* With two other keys down, a new Select may be the ghost of a third key
++    * the controller has not reported yet (it runs a scan ahead, see above).
++    * It waits for that key (SR_KP_LATE_NS) and is believed only if none
++    * comes. */
++   else if (others >= 2)
++   {
++      for (i = 0; i < SR_KP_KEYS; i++)
++      {
++         uint16_t bit = (uint16_t)(1 << i);
++         if ((SR_KP_AHEAD & bit) && (fresh & bit))
++         {
++            fresh &= ~bit;
++            if (!kp->late_since[i])
++               kp->late_since[i] = now;
++         }
++      }
++   }
++
++   if (!wait)
++      return;
++
++   /* the cheapest set of waiting keys that, taken as real, explains every
++    * held key; at most nine keys wait, so every subset is tried */
++   sub = wait;
++   for (;;)
++   {
++      if ((sr_kp_closure((uint16_t)(kp->live | sub)) & need) == need)
++      {
++         int cost = 0;
++         for (i = 0; i < SR_KP_KEYS; i++)
++         {
++            if (!(sub >> i & 1))
++               continue;
++            if (fresh >> i & 1)
++            {
++               /* a key pressed moments ago is the one being mashed */
++               bool recent = kp->prev_down[i]
++                  && now - kp->prev_down[i] < SR_KP_RECENT_NS;
++               cost += 100 + sr_kp_cost[i] - (recent ? 3 : 0);
++            }
++            else
++               cost += 1000 + sr_kp_cost[i];
++         }
++         if (best_cost < 0 || cost < best_cost)
++         {
++            best_cost = cost;
++            best      = (uint16_t)sub;
++         }
++      }
++      if (!sub)
++         break;
++      sub = (sub - 1) & wait;
++   }
++
++   for (i = 0; i < SR_KP_KEYS; i++)
++   {
++      uint16_t bit = (uint16_t)(1 << i);
++      if (!(wait & bit))
++         continue;
++      if (!(best & bit))
++      {
++         /* explained by the others: a ghost, or a fourth corner no grid
++          * can tell from one */
++         if ((fresh & bit) || kp->late_since[i])
++         {
++            kp->ghosts++;
++            kp->held_back |= bit;
++         }
++         kp->late_since[i] = 0;
++         continue;
++      }
++      if (fresh & bit)
++      {
++         kp->live |= bit;
++         sr_kp_emit(&kp->down[i], AKEY_EVENT_ACTION_DOWN);
++         continue;
++      }
++      if (!kp->late_since[i])
++         kp->late_since[i] = now;
++      else if (now - kp->late_since[i] >= SR_KP_LATE_NS)
++      {
++         kp->late_since[i] = 0;
++         kp->live         |= bit;
++         sr_kp_emit(&kp->down[i], AKEY_EVENT_ACTION_DOWN);
++      }
++   }
++}
++
++/* What was held back since the last line, and what was down at the time:
++ * one line per judged scan, so a dead button can be traced in logcat. */
++static void sr_kp_log(sr_keypad_t *kp)
++{
++   char dropped[64], held[80];
++   size_t d = 0, h = 0;
++   int i;
++
++   if (!kp->ghosts)
++      return;
++   dropped[0] = held[0] = '\0';
++   for (i = 0; i < SR_KP_KEYS; i++)
++   {
++      if ((kp->held_back >> i & 1) && d < sizeof(dropped) - 8)
++         d += (size_t)snprintf(dropped + d, sizeof(dropped) - d, "%s%s",
++               d ? " " : "", sr_kp_name[i]);
++      if ((kp->live >> i & 1) && h < sizeof(held) - 8)
++         h += (size_t)snprintf(held + h, sizeof(held) - h, "%s%s",
++               h ? " " : "", sr_kp_name[i]);
++   }
++   __android_log_print(ANDROID_LOG_INFO, "RetroArch",
++         "[Slickrock] Sidephone keypad: held back %s (%u), down: %s\n",
++         dropped, kp->ghosts, h ? held : "nothing");
++   kp->ghosts    = 0;
++   kp->held_back = 0;
++}
++
++/* Under sr_reader.lock: judges the scan gathered so far. */
++static void sr_kp_flush(sr_keypad_t *kp, int64_t now)
++{
++   uint16_t fresh = 0;
++   int n;
++
++   for (n = 0; n < kp->scan_n; n++)
++   {
++      const sr_event_t *e = &kp->scan[n];
++      int k               = sr_kp_index(e->keycode);
++      uint16_t bit        = (uint16_t)(1 << k);
++
++      if (e->action == AKEY_EVENT_ACTION_DOWN)
++      {
++         if (kp->raw & bit)
++         {
++            /* a repeat goes on only for a key that is live */
++            if (kp->live & bit)
++               sr_ring_put(e);
++            continue;
++         }
++         kp->raw         |= bit;
++         kp->prev_down[k] = kp->down[k].event_time;
++         kp->down[k]      = *e;
++         fresh           |= bit;
++      }
++      else if (e->action == AKEY_EVENT_ACTION_UP)
++      {
++         kp->raw          &= ~bit;
++         fresh            &= ~bit;
++         kp->late_since[k] = 0;
++         /* normally already sent by sr_kp_feed; still live here only if a
++          * late accept passed the key on after its release arrived */
++         if (kp->live & bit)
++         {
++            kp->live &= ~bit;
++            sr_ring_put(e);
++         }
++      }
++   }
++   kp->scan_n = 0;
++
++   sr_kp_settle(kp, fresh, now);
++   sr_kp_log(kp);
++}
++
++static sr_keypad_t *sr_kp_slot(int32_t device_id, int64_t now)
++{
++   int i, pick = 0;
++
++   for (i = 0; i < SR_KP_SLOTS; i++)
++      if (sr_keypads[i].used && sr_keypads[i].device_id == device_id)
++         return &sr_keypads[i];
++
++   /* a new device: a free slot, or the one heard from least recently,
++    * after letting go of anything it still had live */
++   for (i = 0; i < SR_KP_SLOTS; i++)
++   {
++      if (!sr_keypads[i].used)
++      {
++         pick = i;
++         break;
++      }
++      if (sr_keypads[i].last_arrival < sr_keypads[pick].last_arrival)
++         pick = i;
++   }
++
++   if (sr_keypads[pick].used)
++   {
++      sr_keypad_t *old = &sr_keypads[pick];
++      if (old->scan_n)
++         sr_kp_flush(old, now);
++      for (i = 0; i < SR_KP_KEYS; i++)
++         if (old->live >> i & 1)
++            sr_kp_emit(&old->down[i], AKEY_EVENT_ACTION_UP);
++   }
++
++   memset(&sr_keypads[pick], 0, sizeof(sr_keypads[pick]));
++   sr_keypads[pick].used      = true;
++   sr_keypads[pick].device_id = device_id;
++   return &sr_keypads[pick];
++}
++
++/* Under sr_reader.lock. A keypad key event joins the scan being gathered;
++ * one from a later scan closes that scan first. */
++static void sr_kp_feed(const sr_event_t *e)
++{
++   int64_t now     = sr_now_ns();
++   sr_keypad_t *kp = sr_kp_slot(e->device_id, now);
++
++   if (kp->scan_n
++         && (   e->event_time - kp->scan_time >  SR_KP_SCAN_NS
++             || e->event_time - kp->scan_time < -SR_KP_SCAN_NS
++             || kp->scan_n == SR_KP_KEYS * 2))
++      sr_kp_flush(kp, now);
++
++   /* A release is never a ghost: a key that was passed on is let go at
++    * once. The release still joins the scan, so the held keys stay right
++    * for judging the rest of it (and a repeat waiting there goes nowhere,
++    * the key no longer being live). */
++   if (e->action == AKEY_EVENT_ACTION_UP)
++   {
++      uint16_t bit = (uint16_t)(1 << sr_kp_index(e->keycode));
++      if (kp->live & bit)
++      {
++         kp->live &= ~bit;
++         sr_ring_put(e);
++      }
++   }
++
++   if (!kp->scan_n)
++      kp->scan_time = e->event_time;
++   kp->scan[kp->scan_n++] = *e;
++   kp->last_arrival       = now;
++}
++
++/* Under sr_reader.lock: scans that have gone quiet, and late accepts that
++ * are due. True if anything went to the ring. */
++static bool sr_kp_tick(int64_t now)
++{
++   unsigned head = sr_reader.head;
++   int s, i;
++
++   for (s = 0; s < SR_KP_SLOTS; s++)
++   {
++      sr_keypad_t *kp = &sr_keypads[s];
++      if (!kp->used)
++         continue;
++      if (kp->scan_n && now - kp->last_arrival >= SR_KP_QUIET_NS)
++         sr_kp_flush(kp, now);
++      for (i = 0; i < SR_KP_KEYS; i++)
++         if (kp->late_since[i] && now - kp->late_since[i] >= SR_KP_LATE_NS)
++         {
++            sr_kp_settle(kp, 0, now);
++            sr_kp_log(kp);
++            break;
++         }
++   }
++
++   return sr_reader.head != head;
++}
++
++/* Milliseconds until the keypad next needs a look, or -1 for never. */
++static int sr_kp_timeout_ms(int64_t now)
++{
++   int64_t due = 0;
++   int s, i;
++
++   for (s = 0; s < SR_KP_SLOTS; s++)
++   {
++      sr_keypad_t *kp = &sr_keypads[s];
++      if (!kp->used)
++         continue;
++      if (kp->scan_n)
++      {
++         int64_t t = kp->last_arrival + SR_KP_QUIET_NS;
++         if (!due || t < due)
++            due = t;
++      }
++      for (i = 0; i < SR_KP_KEYS; i++)
++         if (kp->late_since[i])
++         {
++            int64_t t = kp->late_since[i] + SR_KP_LATE_NS;
++            if (!due || t < due)
++               due = t;
++         }
++   }
++   if (!due)
++      return -1;
++   if (due <= now)
++      return 0;
++   return (int)((due - now + 999999LL) / 1000000LL);
++}
++
++/* Under sr_reader.lock. Copies the event when there is something to apply
++ * and returns how it is to be finished. */
++static int32_t sr_reader_take(const AInputEvent *event)
++{
++   sr_event_t e;
++   int32_t handled = 1;
++
++   memset(&e, 0, sizeof(e));
++   e.type      = AInputEvent_getType(event);
++   e.device_id = AInputEvent_getDeviceId(event);
++   e.source    = AInputEvent_getSource(event);
++
++   switch (e.type)
++   {
++      case AINPUT_EVENT_TYPE_KEY:
++         e.keycode = AKeyEvent_getKeyCode(event);
++         if (!e.keycode)
++            return 1; /* stock ignores these too */
++         if (     e.keycode == AKEYCODE_VOLUME_UP
++               || e.keycode == AKEYCODE_VOLUME_DOWN)
++         {
++            handled = 0;
++            if (AKeyEvent_getFlags(event)
++                  & SLICKROCK_AKEY_EVENT_FLAG_PREDISPATCH)
++               return 0;
++         }
++         e.action     = AKeyEvent_getAction(event);
++         e.meta_state = AKeyEvent_getMetaState(event);
++         e.event_time = AKeyEvent_getEventTime(event);
++         if (     sr_kp_index(e.keycode) >= 0
++               && sr_kp_is_keypad(e.device_id))
++         {
++            sr_kp_feed(&e);
++            return handled;
++         }
++         break;
++      case AINPUT_EVENT_TYPE_MOTION:
++         sr_copy_motion(event, &e);
++         break;
++      default:
++         return 1;
++   }
++
++   sr_ring_put(&e);
++   return handled;
++}
++
++/* Reader thread. */
++static void sr_reader_drain_queue(void)
++{
++   AInputEvent *event = NULL;
++   bool         taken = false;
++
++   slock_lock(sr_reader.lock);
++   if (sr_reader.queue)
++   {
++      while (AInputQueue_getEvent(sr_reader.queue, &event) >= 0)
++      {
++         int32_t handled = sr_reader_take(event);
++         AInputQueue_finishEvent(sr_reader.queue, event, handled);
++         taken = true;
++      }
++   }
++   /* keypad scans that have gone quiet, late accepts that are due */
++   if (sr_kp_tick(sr_now_ns()))
++      taken = true;
++   slock_unlock(sr_reader.lock);
++
++   if (taken)
++   {
++      char knock = 0;
++      /* a full pipe already has the main thread due to wake */
++      if (write(sr_reader.wake[1], &knock, 1) < 0) { }
++   }
++}
++
++static void sr_reader_thread(void *data)
++{
++   ALooper *looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
++
++   ALooper_acquire(looper);
++
++   slock_lock(sr_reader.lock);
++   sr_reader.looper = looper;
++   sr_reader.ready  = true;
++   scond_signal(sr_reader.cond);
++   slock_unlock(sr_reader.lock);
++
++   for (;;)
++   {
++      int timeout, ident;
++
++      /* the keypad filter may be waiting for a scan to go quiet */
++      slock_lock(sr_reader.lock);
++      timeout = sr_kp_timeout_ms(sr_now_ns());
++      slock_unlock(sr_reader.lock);
++
++      ident = ALooper_pollOnce(timeout, NULL, NULL, NULL);
++
++      if (ident == LOOPER_ID_INPUT || ident == ALOOPER_POLL_TIMEOUT)
++         sr_reader_drain_queue();
++      else if (ident == ALOOPER_POLL_ERROR)
++         usleep(1000);
++   }
++}
++
++/* Main thread. Starts the reader the first time it is asked; false if it
++ * could not be had. Then nothing reads the queue, and android_input_init
++ * refuses to start the input driver, which RetroArch reports and treats
++ * as fatal. Called from both places that need the reader, so their order
++ * does not matter. */
++static bool sr_reader_start(struct android_app *android_app)
++{
++   static bool tried = false;
++
++   if (tried)
++      return sr_reader.running;
++   tried = true;
++
++   if (     !(sr_reader.lock = slock_new())
++         || !(sr_reader.cond = scond_new()))
++   {
++      RARCH_ERR("[Android Input] Input reader: no lock. No input.\n");
++      return false;
++   }
++
++   if (pipe(sr_reader.wake) != 0)
++   {
++      RARCH_ERR("[Android Input] Input reader: no pipe (errno %d). No input.\n",
++            errno);
++      sr_reader.wake[0] = sr_reader.wake[1] = -1;
++      return false;
++   }
++   fcntl(sr_reader.wake[0], F_SETFL, O_NONBLOCK);
++   fcntl(sr_reader.wake[1], F_SETFL, O_NONBLOCK);
++   fcntl(sr_reader.wake[0], F_SETFD, FD_CLOEXEC);
++   fcntl(sr_reader.wake[1], F_SETFD, FD_CLOEXEC);
++
++   if (!(sr_reader.thread = sthread_create(sr_reader_thread, NULL)))
++   {
++      RARCH_ERR("[Android Input] Input reader: no thread. No input.\n");
++      close(sr_reader.wake[0]);
++      close(sr_reader.wake[1]);
++      sr_reader.wake[0] = sr_reader.wake[1] = -1;
++      return false;
++   }
++
++   slock_lock(sr_reader.lock);
++   while (!sr_reader.ready)
++      scond_wait(sr_reader.cond, sr_reader.lock);
++   slock_unlock(sr_reader.lock);
++
++   ALooper_addFd(android_app->looper, sr_reader.wake[0], LOOPER_ID_INPUT,
++         ALOOPER_EVENT_INPUT, NULL, NULL);
++   sr_reader.running = true;
++   return true;
++}
++
++/* Main thread, from APP_CMD_INPUT_CHANGED. */
++static void sr_reader_set_queue(struct android_app *android_app,
++      AInputQueue *queue)
++{
++   if (!sr_reader_start(android_app))
++      return;
++
++   slock_lock(sr_reader.lock);
++   if (sr_reader.queue)
++      AInputQueue_detachLooper(sr_reader.queue);
++   sr_reader.queue = queue;
++   if (queue)
++      AInputQueue_attachLooper(queue, sr_reader.looper,
++            LOOPER_ID_INPUT, NULL, NULL);
++   slock_unlock(sr_reader.lock);
++}
++
++/* Main thread: LOOPER_ID_INPUT fired. Takes the reader's knocks; the
++ * copies wait in the ring. */
++static void sr_reader_service(void)
++{
++   char knocks[64];
++   while (read(sr_reader.wake[0], knocks, sizeof(knocks)) > 0) { }
++}
++
++/* Main thread, when the activity goes away: the queue is not read again. */
++void android_input_reader_release(void)
++{
++   if (!sr_reader.lock)
++      return;
++
++   slock_lock(sr_reader.lock);
++   if (sr_reader.queue)
++      AInputQueue_detachLooper(sr_reader.queue);
++   sr_reader.queue = NULL;
++   slock_unlock(sr_reader.lock);
++}
++
+ static void android_input_poll_main_cmd(void)
+ {
+    int8_t cmd;
+@@ -385,16 +1284,10 @@ static void android_input_poll_main_cmd(void)
+       case APP_CMD_INPUT_CHANGED:
+          slock_lock(android_app->mutex);
+ 
+-         if (android_app->inputQueue)
+-            AInputQueue_detachLooper(android_app->inputQueue);
+-
++         /* Slickrock: the queue goes to the reader thread */
++         sr_reader_set_queue(android_app, android_app->pendingInputQueue);
+          android_app->inputQueue = android_app->pendingInputQueue;
+ 
+-         if (android_app->inputQueue)
+-            AInputQueue_attachLooper(android_app->inputQueue,
+-                  android_app->looper, LOOPER_ID_INPUT, NULL,
+-                  NULL);
+-
+          scond_broadcast(android_app->cond);
+          slock_unlock(android_app->mutex);
+ 
+@@ -506,13 +1399,25 @@ static void android_input_poll_main_cmd(void)
+    }
+ }
+ 
++/* Slickrock: the handlers below read the reader's copy (sr_event_t) where
++ * stock read the event; these stand in for AMotionEvent_getX/getY. */
++static INLINE float sr_x(const sr_event_t *e, size_t i)
++{
++   return (i < (size_t)e->pointer_count) ? e->x[i] : 0.0f;
++}
++
++static INLINE float sr_y(const sr_event_t *e, size_t i)
++{
++   return (i < (size_t)e->pointer_count) ? e->y[i] : 0.0f;
++}
++
+ static void engine_handle_dpad_default(struct android_app *android,
+-      AInputEvent *event, int port, int source)
++      const sr_event_t *event, int port, int source)
+ {
+-   size_t motion_ptr = AMotionEvent_getAction(event) >>
++   size_t motion_ptr = (size_t)event->action >>
+       AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+-   float x           = AMotionEvent_getX(event, motion_ptr);
+-   float y           = AMotionEvent_getY(event, motion_ptr);
++   float x           = sr_x(event, motion_ptr);
++   float y           = sr_y(event, motion_ptr);
+ 
+    android->analog_state[port][0] = (int16_t)(x * 32767.0f);
+    android->analog_state[port][1] = (int16_t)(y * 32767.0f);
+@@ -520,20 +1425,19 @@ static void engine_handle_dpad_default(struct android_app *android,
+ 
+ #ifdef HAVE_DYLIB
+ static void engine_handle_dpad_getaxisvalue(struct android_app *android,
+-      AInputEvent *event, int port, int source)
++      const sr_event_t *event, int port, int source)
+ {
+-   size_t motion_ptr = AMotionEvent_getAction(event) >>
+-      AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+-   float x           = AMotionEvent_getAxisValue(event, AXIS_X, motion_ptr);
+-   float y           = AMotionEvent_getAxisValue(event, AXIS_Y, motion_ptr);
+-   float z           = AMotionEvent_getAxisValue(event, AXIS_Z, motion_ptr);
+-   float rz          = AMotionEvent_getAxisValue(event, AXIS_RZ, motion_ptr);
+-   float hatx        = AMotionEvent_getAxisValue(event, AXIS_HAT_X, motion_ptr);
+-   float haty        = AMotionEvent_getAxisValue(event, AXIS_HAT_Y, motion_ptr);
+-   float ltrig       = AMotionEvent_getAxisValue(event, AXIS_LTRIGGER, motion_ptr);
+-   float rtrig       = AMotionEvent_getAxisValue(event, AXIS_RTRIGGER, motion_ptr);
+-   float brake       = AMotionEvent_getAxisValue(event, AXIS_BRAKE, motion_ptr);
+-   float gas         = AMotionEvent_getAxisValue(event, AXIS_GAS, motion_ptr);
++   /* copied at the pointer the action names, as stock read them */
++   float x           = event->axis[SR_AXIS_X];
++   float y           = event->axis[SR_AXIS_Y];
++   float z           = event->axis[SR_AXIS_Z];
++   float rz          = event->axis[SR_AXIS_RZ];
++   float hatx        = event->axis[SR_AXIS_HAT_X];
++   float haty        = event->axis[SR_AXIS_HAT_Y];
++   float ltrig       = event->axis[SR_AXIS_LTRIGGER];
++   float rtrig       = event->axis[SR_AXIS_RTRIGGER];
++   float brake       = event->axis[SR_AXIS_BRAKE];
++   float gas         = event->axis[SR_AXIS_GAS];
+ 
+    android->hat_state[port][0]    = (int)hatx;
+    android->hat_state[port][1]    = (int)haty;
+@@ -584,10 +1488,14 @@ static void *android_input_init(const char *joypad_driver)
+ {
+    int32_t sdk;
+    struct android_app *android_app = (struct android_app*)g_android;
+-   android_input_t *android = (android_input_t*)
+-      calloc(1, sizeof(*android));
++   android_input_t *android        = NULL;
+ 
+-   if (!android)
++   /* Slickrock: input comes only through the reader thread; without it
++    * there is no input driver (sr_reader_start has logged why) */
++   if (!sr_reader_start(android_app))
++      return NULL;
++
++   if (!(android = (android_input_t*)calloc(1, sizeof(*android))))
+       return NULL;
+ 
+    android->mouse_activated = false;
+@@ -605,11 +1513,6 @@ static void *android_input_init(const char *joypad_driver)
+ 
+    engine_handle_dpad          = engine_handle_dpad_default;
+ 
+-   if (sdk > 10)
+-      android_input_poll_input = android_input_poll_input_default;
+-   else
+-      android_input_poll_input = android_input_poll_input_gingerbread;
+-
+    if (!android_input_init_handle())
+    {
+       RARCH_WARN("[Android] Unable to open libandroid.so\n");
+@@ -640,7 +1543,7 @@ static int android_check_quick_tap(android_input_t *android)
+ }
+ 
+ static INLINE void android_mouse_calculate_deltas(android_input_t *android,
+-      AInputEvent *event,size_t motion_ptr,int source)
++      const sr_event_t *event,size_t motion_ptr,int source)
+ {
+    unsigned video_width, video_height;
+    video_driver_get_size(&video_width, &video_height);
+@@ -666,19 +1569,21 @@ static INLINE void android_mouse_calculate_deltas(android_input_t *android,
+     * NOTE: AINPUT_SOURCE_* defines have multiple bits set so do full check */
+    if ((source & AINPUT_SOURCE_MOUSE_RELATIVE) == AINPUT_SOURCE_MOUSE_RELATIVE)
+    {
+-      x_delta = AMotionEvent_getX(event, motion_ptr);
+-      y_delta = AMotionEvent_getY(event, motion_ptr);
++      x_delta = sr_x(event, motion_ptr);
++      y_delta = sr_y(event, motion_ptr);
+    }
+    else
+    {
++      /* Slickrock: where the pointer is now, for the fallback below */
++      float abs_x = sr_x(event, motion_ptr);
++      float abs_y = sr_y(event, motion_ptr);
++
+       /* This axis is only available on Android Nougat or on
+       * Android devices with NVIDIA extensions */
+       if (p_AMotionEvent_getAxisValue)
+       {
+-         x_delta = AMotionEvent_getAxisValue(event,AMOTION_EVENT_AXIS_RELATIVE_X,
+-               motion_ptr);
+-         y_delta = AMotionEvent_getAxisValue(event,AMOTION_EVENT_AXIS_RELATIVE_Y,
+-               motion_ptr);
++         x_delta = event->axis[SR_AXIS_RELATIVE_X];
++         y_delta = event->axis[SR_AXIS_RELATIVE_Y];
+       }
+ 
+       /* If AXIS_RELATIVE had 0 values it might be because we're not
+@@ -691,22 +1596,30 @@ static INLINE void android_mouse_calculate_deltas(android_input_t *android,
+       */
+       if (!x_delta && !y_delta)
+       {
+-         x = AMotionEvent_getX(event, motion_ptr);
+-         y = AMotionEvent_getY(event, motion_ptr);
+-
+-         x_delta = (x_delta - android->mouse_x_prev);
+-         y_delta = (y_delta - android->mouse_y_prev);
+-
+-         android->mouse_x_prev = x;
+-         android->mouse_y_prev = y;
++         x = abs_x;
++         y = abs_y;
++
++         /* Slickrock: the move since the last mouse event. Stock took
++          * 0 minus the last position, which a click without motion would
++          * now add to the sum. */
++         x_delta = x - android->mouse_x_prev;
++         y_delta = y - android->mouse_y_prev;
+       }
++
++      /* Slickrock: kept on every event, so the fallback measures from the
++       * right place after moves the relative axes reported */
++      android->mouse_x_prev = abs_x;
++      android->mouse_y_prev = abs_y;
+    }
+ 
+-   android->mouse_x_delta = x_delta;
+-   android->mouse_y_delta = y_delta;
++   /* Slickrock: summed over the moves applied in one poll (the sum starts
++    * at 0 each poll) and cleared when read, so no relative motion is lost
++    * however many moves one poll applies */
++   android->mouse_x_delta += x_delta;
++   android->mouse_y_delta += y_delta;
+ 
+-   if (!x) x = android->mouse_x + android->mouse_x_delta;
+-   if (!y) y = android->mouse_y + android->mouse_y_delta;
++   if (!x) x = android->mouse_x + x_delta;
++   if (!y) y = android->mouse_y + y_delta;
+ 
+    video_driver_translate_coord_viewport_confined_wrap(&vp,
+             (int) x, (int) y,
+@@ -725,10 +1638,10 @@ static INLINE void android_mouse_calculate_deltas(android_input_t *android,
+ }
+ 
+ static INLINE void android_input_poll_event_type_motion(
+-      android_input_t *android, AInputEvent *event,
++      android_input_t *android, const sr_event_t *event,
+       int port, int source)
+ {
+-   int getaction     = AMotionEvent_getAction(event);
++   int getaction     = event->action;
+    int action        = getaction  & AMOTION_EVENT_ACTION_MASK;
+    size_t motion_ptr = getaction >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+    bool keyup        = (
+@@ -746,18 +1659,20 @@ static INLINE void android_input_poll_event_type_motion(
+       {
+          RARCH_LOG("[Android Input] Mouse activated.\n");
+          android->mouse_activated = true;
++         /* Slickrock: the fallback's first move is measured from here */
++         android->mouse_x_prev    = sr_x(event, motion_ptr);
++         android->mouse_y_prev    = sr_y(event, motion_ptr);
+       }
+       /* getButtonState requires API level 14 */
+       if (p_AMotionEvent_getButtonState)
+       {
+-         int btn              = (int)AMotionEvent_getButtonState(event);
++         int btn              = (int)event->button_state;
+ 
+          android->mouse_l     = (btn & AMOTION_EVENT_BUTTON_PRIMARY);
+          android->mouse_r     = (btn & AMOTION_EVENT_BUTTON_SECONDARY);
+          android->mouse_m     = (btn & AMOTION_EVENT_BUTTON_TERTIARY);
+ 
+-         btn                  = (int)AMotionEvent_getAxisValue(event,
+-               AMOTION_EVENT_AXIS_VSCROLL, motion_ptr);
++         btn                  = (int)event->axis[SR_AXIS_VSCROLL];
+ 
+          if (btn > 0)
+             android->mouse_wu = btn;
+@@ -785,12 +1700,12 @@ static INLINE void android_input_poll_event_type_motion(
+       {
+          /* If touchscreen was pressed for less than 200ms
+           * then register time stamp of a quick tap */
+-         if ((AMotionEvent_getEventTime(event)-AMotionEvent_getDownTime(event))/1000000 < 200)
++         if ((event->event_time-event->down_time)/1000000 < 200)
+          {
+             /* Prevent the quick tap if a button on the overlay is down */
+             input_driver_state_t *input_st = input_state_get_ptr();
+             if (!(input_st->flags & INP_FLAG_BLOCK_POINTER_INPUT))
+-               android->quick_tap_time = AMotionEvent_getEventTime(event);
++               android->quick_tap_time = event->event_time;
+          }
+          android->mouse_l = 0;
+       }
+@@ -804,20 +1719,20 @@ static INLINE void android_input_poll_event_type_motion(
+    else
+    {
+       int      pointer_max     = MIN(
+-            AMotionEvent_getPointerCount(event), MAX_TOUCH);
++            event->pointer_count, MAX_TOUCH);
+ 
+       if (action == AMOTION_EVENT_ACTION_DOWN && ENABLE_TOUCH_SCREEN_MOUSE)
+       {
+          /* When touch screen is pressed, set mouse
+           * previous position to current position
+           * before starting to calculate mouse movement deltas. */
+-         android->mouse_x_prev = AMotionEvent_getX(event, motion_ptr);
+-         android->mouse_y_prev = AMotionEvent_getY(event, motion_ptr);
++         android->mouse_x_prev = sr_x(event, motion_ptr);
++         android->mouse_y_prev = sr_y(event, motion_ptr);
+ 
+          /* If another touch happened within 200ms after a quick tap
+           * then cancel the quick tap and register left mouse button
+           * as being held down */
+-         if ((AMotionEvent_getEventTime(event) - android->quick_tap_time)/1000000 < 200)
++         if ((event->event_time - android->quick_tap_time)/1000000 < 200)
+          {
+             android->quick_tap_time = 0;
+             android->mouse_l        = 1;
+@@ -832,8 +1747,8 @@ static INLINE void android_input_poll_event_type_motion(
+       for (motion_ptr = 0; motion_ptr < pointer_max; motion_ptr++)
+       {
+          struct video_viewport vp = {0};
+-         float x = AMotionEvent_getX(event, motion_ptr);
+-         float y = AMotionEvent_getY(event, motion_ptr);
++         float x = sr_x(event, motion_ptr);
++         float y = sr_y(event, motion_ptr);
+ 
+          /* On other platforms, pointer query uses the confined wrap function, *
+           * but some extra functionality is added to Android which needs the   *
+@@ -877,14 +1792,14 @@ static bool android_is_keyboard_id(int id)
+ }
+ 
+ static INLINE void android_input_poll_event_type_keyboard(
+-      AInputEvent *event, int keycode, int *handled)
++      const sr_event_t *event, int keycode)
+ {
+-   int keydown           = (AKeyEvent_getAction(event)
++   int keydown           = (event->action
+          == AKEY_EVENT_ACTION_DOWN);
+    unsigned keyboardcode = input_keymaps_translate_keysym_to_rk(keycode);
+    /* Set keyboard modifier based on shift,ctrl and alt state */
+    uint16_t mod          = 0;
+-   int meta              = AKeyEvent_getMetaState(event);
++   int meta              = event->meta_state;
+ 
+    if (meta & AMETA_ALT_ON)
+       mod |= RETROKMOD_ALT;
+@@ -903,18 +1818,15 @@ static INLINE void android_input_poll_event_type_keyboard(
+ 
+    input_keyboard_event(keydown, keyboardcode,
+          keyboardcode, mod, RETRO_DEVICE_KEYBOARD);
+-
+-   if ((keycode == AKEYCODE_VOLUME_UP || keycode == AKEYCODE_VOLUME_DOWN))
+-      *handled = 0;
+ }
+ 
+ static INLINE void android_input_poll_event_type_key(
+       struct android_app *android_app,
+-      AInputEvent *event, int port, int keycode, int source,
+-      int type_event, int *handled)
++      const sr_event_t *event, int port, int keycode, int source,
++      int type_event)
+ {
+-   uint8_t *buf = android_key_state[port];
+-   int action   = AKeyEvent_getAction(event);
++   uint8_t *buf = NULL;
++   int action   = event->action;
+    int keysym   = keycode;
+ 
+    /* Handle 'duplicate' inputs that correspond
+@@ -926,6 +1838,19 @@ static INLINE void android_input_poll_event_type_key(
+       default:
+          break;
+    }
++
++   /* Slickrock: a row holds MAX_KEYS * 8 key codes (0-223) and there are
++    * ANDROID_KEYBOARD_PORT + 1 rows. A newer key code (KEYCODE_DPAD_UP_LEFT
++    * is 268) or a device without a port is dropped here instead of being
++    * written past the array. The reads stay inside it: android_input_state
++    * reads only codes from RetroArch's Android key table (163 at most),
++    * android_joypad only codes below LAST_KEYCODE, sr_mark_key the same
++    * bounds as this. */
++   if (     port < 0 || port > ANDROID_KEYBOARD_PORT
++         || keysym < 0 || keysym >= MAX_KEYS * 8)
++      return;
++   buf = android_key_state[port];
++
+    /* some controllers send both the up and down events at once
+     * when the button is released for "special" buttons, like menu buttons
+     * work around that by only using down events for meta keys (which get
+@@ -940,9 +1865,6 @@ static INLINE void android_input_poll_event_type_key(
+          BIT_SET(buf, keysym);
+          break;
+    }
+-
+-   if ((keycode == AKEYCODE_VOLUME_UP || keycode == AKEYCODE_VOLUME_DOWN))
+-      *handled = 0;
+ }
+ 
+ static int android_input_get_id_port(android_input_t *android, int id,
+@@ -1368,9 +2290,9 @@ static void handle_hotplug(android_input_t *android,
+    android->pads_connected++;
+ }
+ 
+-static int android_input_get_id(AInputEvent *event)
++static int android_input_get_id(const sr_event_t *event)
+ {
+-   int id = AInputEvent_getDeviceId(event);
++   int id = event->device_id;
+    if (id == pad_id2)
+       return pad_id1;
+    return id;
+@@ -1384,23 +2306,23 @@ struct TOUCHSTATE
+ };
+ 
+ static void engine_handle_touchpad(
+-      struct android_app *android, AInputEvent *event, int port)
++      struct android_app *android, const sr_event_t *event, int port)
+ {
+    unsigned n;
+    static struct TOUCHSTATE touchstate[64];
+-   int pointer_count	= AMotionEvent_getPointerCount(event);
++   int pointer_count	= event->pointer_count;
+ 
+    for(n = 0; n < pointer_count; ++n)
+    {
+-      int pointer_id	=   AMotionEvent_getPointerId(event, n);
++      int pointer_id	=   ((n < SR_POINTERS) ? event->pointer_id[n] : 0);
+       int action     =   AMOTION_EVENT_ACTION_MASK
+-                       & AMotionEvent_getAction(event);
+-      int raw_action	=   AMotionEvent_getAction(event);
++                       & event->action;
++      int raw_action	=   event->action;
+       if (     action  == AMOTION_EVENT_ACTION_POINTER_DOWN
+             || action  == AMOTION_EVENT_ACTION_POINTER_UP )
+       {
+-         int pointer_index = (AMotionEvent_getAction( event ) & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+-         pointer_id        = AMotionEvent_getPointerId( event, pointer_index);
++         int pointer_index = (event->action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
++         pointer_id        = ((pointer_index < SR_POINTERS) ? event->pointer_id[pointer_index] : 0);
+       }
+ 
+       if (     action  == AMOTION_EVENT_ACTION_DOWN
+@@ -1413,8 +2335,8 @@ static void engine_handle_touchpad(
+ 
+       if (touchstate[pointer_id].down)
+       {
+-         int x = touchstate[pointer_id].x  = AMotionEvent_getX(event, n);
+-         int y = touchstate[pointer_id].y  = AMotionEvent_getY(event, n);
++         int x = touchstate[pointer_id].x  = sr_x(event, n);
++         int y = touchstate[pointer_id].y  = sr_y(event, n);
+          if (x < 360)
+          {
+             android->analog_state[port][0] =
+@@ -1447,140 +2369,249 @@ static void engine_handle_touchpad(
+    }
+ }
+ 
+-static void android_input_poll_input_gingerbread(
+-      android_input_t *android)
++/* Slickrock: one change per poll. The core reads the state once a frame,
++ * after the poll. A press whose down and up both arrived since the last
++ * poll would be set and cleared in the same drain and never seen, so the
++ * drain stops at the second change of anything this poll has already
++ * changed: a key (by key state slot and key), a touch pointer (by device
++ * and pointer id) or a mouse button. That event, and everything after it,
++ * waits for the next poll, in order. A press shorter than a poll so lasts
++ * one frame, and nothing else waits. A repeat that changes nothing does
++ * not count. Main thread only. */
++#define SR_MARK_POINTERS 32
++
++static struct
+ {
+-   AInputEvent              *event = NULL;
+-   struct android_app *android_app = (struct android_app*)g_android;
++   uint8_t keys[ANDROID_KEYBOARD_PORT + 1][MAX_KEYS]; /* changed this poll */
++   struct { int32_t device_id, pointer_id; } ptr[SR_MARK_POINTERS];
++   int     ptr_n;
++   int     mouse;   /* buttons changed this poll: 1 left, 2 right, 4 middle */
++   bool    stopped; /* the drain stopped; nothing more this poll */
++} sr_marks;
++
++static sr_event_t sr_held;       /* the event the drain stopped at */
++static bool       sr_held_valid;
++
++/* False if the key already changed this poll and this would change it
++ * again; otherwise notes the change, if it is one. */
++static bool sr_mark_key(int slot, int keycode, int action)
++{
++   int  keysym = (keycode == AKEYCODE_DPAD_CENTER) ? AKEYCODE_ENTER : keycode;
++   bool down   = (action == AKEY_EVENT_ACTION_DOWN);
+ 
+-   /* Read all pending events. */
+-   if (AInputQueue_getEvent(android_app->inputQueue, &event) >= 0)
++   if (     slot < 0 || slot > ANDROID_KEYBOARD_PORT
++         || keysym <= 0 || keysym >= MAX_KEYS * 8
++         || (action != AKEY_EVENT_ACTION_DOWN && action != AKEY_EVENT_ACTION_UP))
++      return true;
++   if ((BIT_GET(android_key_state[slot], keysym) != 0) == down)
++      return true; /* changes nothing */
++   if (BIT_GET(sr_marks.keys[slot], keysym))
++      return false;
++   BIT_SET(sr_marks.keys[slot], keysym);
++   return true;
++}
++
++static bool sr_pointer_marked(int32_t device_id, int32_t pointer_id)
++{
++   int i;
++   for (i = 0; i < sr_marks.ptr_n; i++)
++      if (     sr_marks.ptr[i].device_id  == device_id
++            && sr_marks.ptr[i].pointer_id == pointer_id)
++         return true;
++   return false;
++}
++
++/* The same for the touch pointers a down, up or cancel names. */
++static bool sr_mark_pointers(const sr_event_t *e)
++{
++   int first, last, i;
++   int idx = (e->action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)
++      >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
++
++   switch (e->action & AMOTION_EVENT_ACTION_MASK)
+    {
+-      int source, type_event, id, port;
+-      int32_t   handled = 0;
+-      if (AInputQueue_preDispatchEvent(android_app->inputQueue, event))
+-         return;
+-      source            = AInputEvent_getSource(event);
+-      type_event        = AInputEvent_getType(event);
+-      id                = android_input_get_id(event);
+-      port              = android_input_get_id_port(android, id, source);
++      case AMOTION_EVENT_ACTION_DOWN:
++      case AMOTION_EVENT_ACTION_UP:
++         first = last = 0;
++         break;
++      case AMOTION_EVENT_ACTION_POINTER_DOWN:
++      case AMOTION_EVENT_ACTION_POINTER_UP:
++         first = last = idx;
++         break;
++      case AMOTION_EVENT_ACTION_CANCEL:
++         first = 0;
++         last  = e->pointer_count - 1;
++         break;
++      default:
++         return true; /* a move puts no pointer down or up */
++   }
++   if (last >= e->pointer_count)
++      return true;
++   if (sr_marks.ptr_n + (last - first + 1) > SR_MARK_POINTERS)
++      return false; /* more than one poll keeps track of: the next one */
++   for (i = first; i <= last; i++)
++      if (sr_pointer_marked(e->device_id, e->pointer_id[i]))
++         return false;
++   for (i = first; i <= last; i++)
++   {
++      sr_marks.ptr[sr_marks.ptr_n].device_id    = e->device_id;
++      sr_marks.ptr[sr_marks.ptr_n++].pointer_id = e->pointer_id[i];
++   }
++   return true;
++}
++
++/* The same for mouse buttons, as android_input_poll_event_type_motion
++ * will read them. */
++static bool sr_mark_mouse(const android_input_t *android, const sr_event_t *e)
++{
++   int was = (android->mouse_l ? 1 : 0) | (android->mouse_r ? 2 : 0)
++           | (android->mouse_m ? 4 : 0);
++   int now = was;
++   int changed;
++
++   if (p_AMotionEvent_getButtonState)
++      now = ((e->button_state & AMOTION_EVENT_BUTTON_PRIMARY)   ? 1 : 0)
++          | ((e->button_state & AMOTION_EVENT_BUTTON_SECONDARY) ? 2 : 0)
++          | ((e->button_state & AMOTION_EVENT_BUTTON_TERTIARY)  ? 4 : 0);
++   else if ((e->action & AMOTION_EVENT_ACTION_MASK) == AMOTION_EVENT_ACTION_DOWN)
++      now |= 1;
++   else if ((e->action & AMOTION_EVENT_ACTION_MASK) == AMOTION_EVENT_ACTION_UP)
++      now &= ~1;
++
++   changed = now ^ was;
++   if (changed & sr_marks.mouse)
++      return false;
++   sr_marks.mouse |= changed;
++   return true;
++}
+ 
+-      if (port < 0 && !android_is_keyboard_id(id))
+-         port = android_input_recover_port(android, id);
++/* Slickrock: applies one copy the reader took, the way the stock poll
++ * applied the event itself (it was finished when it was copied). False,
++ * with nothing applied, if it would change something this poll has
++ * already changed. */
++static bool sr_apply(android_input_t *android, const sr_event_t *event)
++{
++   struct android_app *android_app = (struct android_app*)g_android;
++   int source      = event->source;
++   int type_event  = event->type;
++   int id          = android_input_get_id(event);
++   int port        = android_input_get_id_port(android, id, source);
+ 
+-      if (port < 0 && !android_is_keyboard_id(id))
+-         handle_hotplug(android, android_app,
+-         &port, id, source);
++   if (port < 0 && !android_is_keyboard_id(id))
++      port = android_input_recover_port(android, id);
+ 
+-      switch (type_event)
+-      {
+-         case AINPUT_EVENT_TYPE_MOTION:
+-            if ((source & AINPUT_SOURCE_TOUCHPAD))
+-               engine_handle_touchpad(android_app, event, port);
+-            /* Only handle events from a touchscreen or mouse */
+-            else if ((source & (AINPUT_SOURCE_TOUCHSCREEN
+-                        | AINPUT_SOURCE_STYLUS | AINPUT_SOURCE_MOUSE)))
+-               android_input_poll_event_type_motion(android, event,
+-                     port, source);
+-            else
+-               engine_handle_dpad(android_app, event, port, source);
+-            handled = 1;
+-            break;
+-         case AINPUT_EVENT_TYPE_KEY:
+-            {
+-               int keycode = AKeyEvent_getKeyCode(event);
++   if (port < 0 && !android_is_keyboard_id(id))
++      handle_hotplug(android, android_app,
++            &port, id, source);
++
++   switch (type_event)
++   {
++      case AINPUT_EVENT_TYPE_MOTION:
++         if ((source & AINPUT_SOURCE_TOUCHPAD))
++         {
++            if (!sr_mark_pointers(event))
++               return false;
++            engine_handle_touchpad(android_app, event, port);
++         }
++         /* Only handle events from a touchscreen or mouse */
++         else if ((source & (AINPUT_SOURCE_TOUCHSCREEN
++                     | AINPUT_SOURCE_MOUSE_RELATIVE
++                     | AINPUT_SOURCE_STYLUS | AINPUT_SOURCE_MOUSE)))
++         {
++            /* the same test android_input_poll_event_type_motion makes */
++            bool mouse =
++                  (source & AINPUT_SOURCE_MOUSE) == AINPUT_SOURCE_MOUSE
++               || (source & AINPUT_SOURCE_MOUSE_RELATIVE)
++                  == AINPUT_SOURCE_MOUSE_RELATIVE;
++            if (!(mouse
++                     ? sr_mark_mouse(android, event)
++                     : sr_mark_pointers(event)))
++               return false;
++            android_input_poll_event_type_motion(android, event,
++                  port, source);
++         }
++         else
++            engine_handle_dpad(android_app, event, port, source);
++         break;
++      case AINPUT_EVENT_TYPE_KEY:
++         {
++            int keycode = event->keycode;
+ 
+-               if (!keycode)
+-                  break;
++            if (!keycode)
++               break;
+ 
+-               if (android_is_keyboard_id(id))
+-               {
+-                  android_input_poll_event_type_keyboard(
+-                        event, keycode, &handled);
+-                  android_input_poll_event_type_key(
+-                        android_app, event, ANDROID_KEYBOARD_PORT,
+-                        keycode, source, type_event, &handled);
+-               }
+-               else
+-                  android_input_poll_event_type_key(android_app,
+-                     event, port, keycode, source, type_event, &handled);
++            if (android_is_keyboard_id(id))
++            {
++               if (!sr_mark_key(ANDROID_KEYBOARD_PORT, keycode,
++                        event->action))
++                  return false;
++               android_input_poll_event_type_keyboard(event, keycode);
++               android_input_poll_event_type_key(
++                     android_app, event, ANDROID_KEYBOARD_PORT,
++                     keycode, source, type_event);
+             }
+-            break;
+-      }
+-
+-      AInputQueue_finishEvent(android_app->inputQueue, event, handled);
++            else
++            {
++               if (!sr_mark_key(port, keycode, event->action))
++                  return false;
++               android_input_poll_event_type_key(android_app,
++                     event, port, keycode, source, type_event);
++            }
++         }
++         break;
+    }
++   return true;
+ }
+ 
+-static void android_input_poll_input_default(android_input_t *android)
++/* Slickrock: everything the reader has taken since the last poll, oldest
++ * first, up to the first event that has to wait for the next poll. */
++static void android_input_poll_input(android_input_t *android)
+ {
+-   AInputEvent              *event = NULL;
+-   struct android_app *android_app = (struct android_app*)g_android;
++   sr_event_t event;
++   unsigned   dropped = 0;
++
++   sr_reader_service();
++
++   if (sr_marks.stopped)
++      return;
+ 
+-   /* Read all pending events. */
+-   while (AInputQueue_hasEvents(android_app->inputQueue))
++   /* the event the last poll stopped at is the oldest of all */
++   if (sr_held_valid)
+    {
+-      while (AInputQueue_getEvent(android_app->inputQueue, &event) >= 0)
++      if (!sr_apply(android, &sr_held))
+       {
+-         int32_t   handled = 1;
+-         int predispatched = AInputQueue_preDispatchEvent(
+-               android_app->inputQueue, event);
+-         int        source = AInputEvent_getSource(event);
+-         int    type_event = AInputEvent_getType(event);
+-         int            id = android_input_get_id(event);
+-         int          port = android_input_get_id_port(android, id, source);
+-
+-         if (port < 0 && !android_is_keyboard_id(id))
+-            port = android_input_recover_port(android, id);
+-
+-         if (port < 0 && !android_is_keyboard_id(id))
+-            handle_hotplug(android, android_app,
+-                  &port, id, source);
+-
+-         switch (type_event)
+-         {
+-            case AINPUT_EVENT_TYPE_MOTION:
+-               if ((source & AINPUT_SOURCE_TOUCHPAD))
+-                  engine_handle_touchpad(android_app, event, port);
+-               /* Only handle events from a touchscreen or mouse */
+-               else if ((source & (AINPUT_SOURCE_TOUCHSCREEN
+-                           | AINPUT_SOURCE_MOUSE_RELATIVE
+-                           | AINPUT_SOURCE_STYLUS | AINPUT_SOURCE_MOUSE)))
+-                  android_input_poll_event_type_motion(android, event,
+-                        port, source);
+-               else
+-                  engine_handle_dpad(android_app, event, port, source);
+-               break;
+-            case AINPUT_EVENT_TYPE_KEY:
+-               {
+-                  int keycode = AKeyEvent_getKeyCode(event);
+-
+-                  if (!keycode)
+-                     break;
++         sr_marks.stopped = true;
++         return;
++      }
++      sr_held_valid = false;
++   }
+ 
+-                  if (android_is_keyboard_id(id))
+-                  {
+-                     if (!predispatched)
+-                     {
+-                        android_input_poll_event_type_keyboard(
+-                              event, keycode, &handled);
+-                        android_input_poll_event_type_key(
+-                              android_app, event, ANDROID_KEYBOARD_PORT,
+-                              keycode, source, type_event, &handled);
+-                     }
+-                  }
+-                  else
+-                     android_input_poll_event_type_key(android_app,
+-                           event, port, keycode, source, type_event, &handled);
+-               }
+-               break;
+-         }
++   for (;;)
++   {
++      slock_lock(sr_reader.lock);
++      if (sr_reader.tail == sr_reader.head)
++      {
++         dropped           = sr_reader.dropped;
++         sr_reader.dropped = 0;
++         slock_unlock(sr_reader.lock);
++         break;
++      }
++      event = sr_reader.ring[sr_reader.tail & (SR_RING - 1)];
++      sr_reader.tail++;
++      slock_unlock(sr_reader.lock);
+ 
+-         if (!predispatched)
+-            AInputQueue_finishEvent(android_app->inputQueue, event,
+-                  handled);
++      if (!sr_apply(android, &event))
++      {
++         sr_held          = event;
++         sr_held_valid    = true;
++         sr_marks.stopped = true;
++         break;
+       }
+    }
++
++   if (dropped)
++      RARCH_WARN("[Android Input] %u input events dropped while the main thread was busy.\n",
++            dropped);
+ }
+ 
+ static void android_input_poll_user(android_input_t *android)
+@@ -1628,6 +2659,47 @@ static void android_input_poll_user(android_input_t *android)
+    }
+ }
+ 
++/* Slickrock: NDK r27 and later no longer declare ALooper_pollAll. The
++ * platform defines it as ALooper_pollOnce repeated while the result is
++ * ALOOPER_POLL_CALLBACK, with the timeout counted against one deadline
++ * (system/core libutils Looper::pollAll); this is that loop. What the
++ * poll waits for is not what stock waited for: with input_block_timeout
++ * above 0 it now waits only for the reader's knock. Keys are no longer
++ * held back one per poll, so the wait no longer gathers presses stock
++ * would have spread over frames; it still holds the core back by at least
++ * the timeout every frame. */
++static int slickrock_looper_poll_all(int timeout_ms)
++{
++   int result;
++   int64_t end_ns;
++
++   if (timeout_ms <= 0)
++   {
++      do
++      {
++         result = ALooper_pollOnce(timeout_ms, NULL, NULL, NULL);
++      } while (result == ALOOPER_POLL_CALLBACK);
++      return result;
++   }
++
++   end_ns = sr_now_ns() + (int64_t)timeout_ms * 1000000LL;
++
++   for (;;)
++   {
++      int64_t left_ns;
++
++      result = ALooper_pollOnce(timeout_ms, NULL, NULL, NULL);
++      if (result != ALOOPER_POLL_CALLBACK)
++         return result;
++
++      left_ns = end_ns - sr_now_ns();
++      if (left_ns <= 0)
++         return ALOOPER_POLL_TIMEOUT;
++      /* Round up, as the platform does. */
++      timeout_ms = (int)((left_ns + 999999LL) / 1000000LL);
++   }
++}
++
+ /* Handle all events.
+  */
+ static void android_input_poll(void *data)
+@@ -1637,9 +2709,17 @@ static void android_input_poll(void *data)
+    android_input_t *android        = (android_input_t*)data;
+    settings_t            *settings = config_get_ptr();
+ 
++   /* Slickrock: a new poll, so nothing has changed in it yet and the
++    * mouse has not moved in it yet (a sum nobody read is dropped, not
++    * carried); and the copies already waiting go in now, knock or not */
++   memset(&sr_marks, 0, sizeof(sr_marks));
++   android->mouse_x_delta = 0;
++   android->mouse_y_delta = 0;
++   android_input_poll_input(android);
++
+    while ((ident =
+-            ALooper_pollAll(settings->uints.input_block_timeout,
+-               NULL, NULL, NULL)) >= 0)
++            slickrock_looper_poll_all(
++               (int)settings->uints.input_block_timeout)) >= 0)
+    {
+       switch (ident)
+       {
+@@ -1675,8 +2755,17 @@ bool android_run_events(void *data)
+ {
+    struct android_app *android_app = (struct android_app*)g_android;
+ 
+-   if (ALooper_pollOnce(-1, NULL, NULL, NULL) == LOOPER_ID_MAIN)
+-      android_input_poll_main_cmd();
++   switch (ALooper_pollOnce(-1, NULL, NULL, NULL))
++   {
++      case LOOPER_ID_MAIN:
++         android_input_poll_main_cmd();
++         break;
++      case LOOPER_ID_INPUT:
++         /* Slickrock: no input driver yet; take the reader's knock so
++          * this pump does not spin. The copies wait in the ring. */
++         sr_reader_service();
++         break;
++   }
+ 
+    /* Check if we are exiting. */
+    if (android_app->destroyRequested != 0)
+@@ -1767,7 +2856,7 @@ static int16_t android_input_state(
+                   if (device == RARCH_DEVICE_MOUSE_SCREEN)
+                      return android->mouse_x_viewport_screen;
+ 
+-                  val = android->mouse_x_delta;
++                  val = (int)android->mouse_x_delta;
+                   android->mouse_x_delta = 0;
+                   /* flush delta after it has been read */
+                   return val;
+@@ -1775,7 +2864,7 @@ static int16_t android_input_state(
+                   if (device == RARCH_DEVICE_MOUSE_SCREEN)
+                      return android->mouse_y_viewport_screen;
+ 
+-                  val = android->mouse_y_delta;
++                  val = (int)android->mouse_y_delta;
+                   android->mouse_y_delta = 0;
+                   /* flush delta after it has been read */
+                   return val;
+@@ -1809,12 +2898,12 @@ static int16_t android_input_state(
+                      return android->pointer[idx].y;
+                /* Deprecated relative lightgun. */
+                case RETRO_DEVICE_ID_LIGHTGUN_X:
+-                  val                    = android->mouse_x_delta;
++                  val                    = (int)android->mouse_x_delta;
+                   android->mouse_x_delta = 0;
+                   /* flush delta after it has been read */
+                   return val;
+                case RETRO_DEVICE_ID_LIGHTGUN_Y:
+-                  val                    = android->mouse_y_delta;
++                  val                    = (int)android->mouse_y_delta;
+                   android->mouse_y_delta = 0;
+                   /* flush delta after it has been read */
+                   return val;
+diff --git a/input/drivers_joypad/android_joypad.c b/input/drivers_joypad/android_joypad.c
+index 10fa4f5..9c0dec1 100644
+--- a/input/drivers_joypad/android_joypad.c
++++ b/input/drivers_joypad/android_joypad.c
+@@ -104,12 +104,17 @@ static int16_t android_joypad_state(
+    int i;
+    int16_t ret                          = 0;
+    struct android_app *android_app      = (struct android_app*)g_android;
+-   uint8_t *buf                         = android_keyboard_state_get(port);
+    uint16_t port_idx                    = joypad_info->joy_idx;
++   uint8_t *buf                         = NULL;
+ 
+    if (port_idx >= DEFAULT_MAX_PADS)
+       return 0;
+ 
++   /* Slickrock: buttons from the device's slot, like its hats and axes
++    * below and like android_joypad_button (whose callers pass joy_idx);
++    * 'port' is the user, which differs once devices are reassigned. */
++   buf = android_keyboard_state_get(port_idx);
++
+    for (i = 0; i < RARCH_FIRST_CUSTOM_BIND; i++)
+    {
+       /* Auto-binds are per joypad, not per user. */
+diff --git a/pkg/android/phoenix/AndroidManifest.xml b/pkg/android/phoenix/AndroidManifest.xml
+index ba4201e..bd237c1 100644
+--- a/pkg/android/phoenix/AndroidManifest.xml
++++ b/pkg/android/phoenix/AndroidManifest.xml
+@@ -1,7 +1,6 @@
+ <!-- <!DOCTYPE manifest [ <!ENTITY % versionDTD SYSTEM "../../../version.dtd"> %versionDTD; ]> !-->
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+           xmlns:tools="http://schemas.android.com/tools"
+-    package="com.retroarch"
+     android:versionCode="1597175267"
+     android:versionName="1.22.2"
+     android:installLocation="internalOnly">
+diff --git a/pkg/android/phoenix/build.gradle b/pkg/android/phoenix/build.gradle
+index 6b0660c..0fe8272 100644
+--- a/pkg/android/phoenix/build.gradle
++++ b/pkg/android/phoenix/build.gradle
+@@ -1,18 +1,18 @@
+ buildscript {
+   repositories {
+     google()
+-    jcenter()
++    mavenCentral()
+   }
+ 
+   dependencies {
+-    classpath 'com.android.tools.build:gradle:4.2.0'
++    classpath 'com.android.tools.build:gradle:8.13.2'
+   }
+ }
+ 
+ allprojects {
+     repositories {
+         google()
+-        jcenter()
++        mavenCentral()
+     }
+ 
+     Properties props = new Properties()
+@@ -25,14 +25,37 @@ allprojects {
+ apply plugin: 'com.android.application'
+ 
+ android {
+-  compileSdkVersion 30
+-  buildToolsVersion "30.0.3"
+-  ndkVersion "22.0.7026061"
++  namespace "com.retroarch"
++
++  compileSdkVersion 36
++  buildToolsVersion "36.0.0"
++  ndkVersion "29.0.14206865"
++
++  buildFeatures {
++    buildConfig true
++    resValues true
++  }
++
++  compileOptions {
++    sourceCompatibility JavaVersion.VERSION_1_8
++    targetCompatibility JavaVersion.VERSION_1_8
++  }
++
++  packagingOptions {
++    jniLibs {
++      useLegacyPackaging = true
++    }
++  }
++
++  lint {
++    checkReleaseBuilds false
++    abortOnError false
++  }
+ 
+   flavorDimensions "variant"
+ 
+   defaultConfig {
+-    minSdkVersion 16
++    minSdkVersion 21
+     externalNativeBuild {
+       ndkBuild {
+         arguments "-j${Runtime.runtime.availableProcessors()}"
+@@ -44,6 +67,21 @@ android {
+   }
+ 
+   productFlavors {
++    // RetroArch 1.22.2 with the input reader in input/drivers/android_input.c (each key is
++    // read once, before the IME, by its own thread), under its own package so it installs
++    // beside stock RetroArch. sr3: 1.22.2-sr3.
++    slickrock {
++      applicationId 'com.bradwhite.slickrock.retroarch'
++      resValue "string", "app_name", "RetroArch for Slickrock"
++      buildConfigField "boolean", "PLAY_STORE_BUILD", "false"
++      versionCode 122020003
++      versionName "1.22.2"
++
++      dimension "variant"
++      ndk {
++        abiFilters 'arm64-v8a', 'armeabi-v7a'
++      }
++    }
+     normal {
+       resValue "string", "app_name", "RetroArch"
+       buildConfigField "boolean", "PLAY_STORE_BUILD", "false"
+@@ -107,6 +145,9 @@ android {
+     normal {
+       java.srcDirs += ['../play-core-stub']
+     }
++    slickrock {
++      java.srcDirs += ['../play-core-stub']
++    }
+     aarch64 {
+       java.srcDirs += ['../play-core-stub']
+       res.srcDirs = ['res', 'res64']
+diff --git a/pkg/android/phoenix/settings.gradle b/pkg/android/phoenix/settings.gradle
+new file mode 100644
+index 0000000..02add95
+--- /dev/null
++++ b/pkg/android/phoenix/settings.gradle
+@@ -0,0 +1 @@
++rootProject.name = "retroarch-phoenix"
+diff --git a/pkg/android/phoenix/src/com/retroarch/browser/retroactivity/RetroActivityFuture.java b/pkg/android/phoenix/src/com/retroarch/browser/retroactivity/RetroActivityFuture.java
+index f74c9d1..4b9dee3 100644
+--- a/pkg/android/phoenix/src/com/retroarch/browser/retroactivity/RetroActivityFuture.java
++++ b/pkg/android/phoenix/src/com/retroarch/browser/retroactivity/RetroActivityFuture.java
+@@ -1,6 +1,7 @@
+ package com.retroarch.browser.retroactivity;
+ 
+ import android.util.Log;
++import android.view.InputDevice;
+ import android.view.PointerIcon;
+ import android.view.View;
+ import android.view.WindowManager;
+@@ -62,6 +63,21 @@ public final class RetroActivityFuture extends RetroActivityCamera {
+     isRunning = true;
+     mDecorView = getWindow().getDecorView();
+ 
++    // Slickrock: Android holds stick, hat and touch-drag events back until the next
++    // display frame unless unbuffered dispatch is asked for (API 30+). ViewRootImpl only
++    // picks the request up from an attached view, and the window is attached after
++    // onResume, so the request is posted: the decor view runs it once attached.
++    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
++      final View decor = mDecorView;
++      decor.post(new Runnable() {
++        @Override
++        public void run() {
++          decor.requestUnbufferedDispatch(
++              InputDevice.SOURCE_CLASS_JOYSTICK | InputDevice.SOURCE_CLASS_POINTER);
++        }
++      });
++    }
++
+     // If QUITFOCUS parameter is provided then enable that Retroarch quits when focus is lost
+     quitfocus = getIntent().hasExtra("QUITFOCUS");
+   }
