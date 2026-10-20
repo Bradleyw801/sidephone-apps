@@ -3,12 +3,21 @@ name: Publish repository
 # Vets new APKs, builds the signed F-Droid index and publishes it, with the install page,
 # to GitHub Pages.
 #
-# New builds go into fdroid/incoming/, whole or as NAME.apk.part00, .part01, ...
-# (PUBLISH-TO-APP-PACK on Brad's PC sends them there; GitHub's "Upload files" works too).
+# New builds arrive two ways:
+#  - Slickrock Station and RetroArch for Slickrock are published as releases of
+#    Bradleyw801/slickrock-releases. Every run, and an hourly schedule, fetches the newest
+#    of each (RetroArch's arm64-v8a build) into fdroid/incoming when the pack does not
+#    already serve it. A scheduled run with nothing new stops there.
+#  - Tyle, Relay and Texts go into fdroid/incoming/, whole or as NAME.apk.part00, .part01,
+#    ... (PUBLISH-TO-APP-PACK on Brad's PC for Tyle; git push or GitHub's "Upload files").
 # tools/intake.py keeps the newest build of each app signed with the key pinned in its
 # metadata and removes the old one. Anything it refuses (wrong key, not newer, unknown
 # app) is deleted, everything else is still published, and the run then fails so the
 # refusal shows up.
+#
+# The site also carries the current build of each app under a fixed name (slickrock.apk,
+# retroarch.apk, tileshift.apk, relay.apk, texts.apk) with its version in a .json of the
+# same name, for direct download links.
 #
 # Secrets (Settings, Secrets and variables, Actions):
 #   FDROID_KEYSTORE_B64   base64 of fdroid/keystore.p12
@@ -25,6 +34,8 @@ on:
       - "tools/**"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
+  schedule:
+    - cron: "41 * * * *"
 
 permissions:
   contents: write
@@ -40,24 +51,72 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       refused: ${{ steps.vet.outputs.refused }}
+      publish: ${{ steps.go.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: Fetch new Slickrock builds from their releases
+        id: fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPO: Bradleyw801/slickrock-releases
+        run: |
+          set -euo pipefail
+          mkdir -p fdroid/incoming source
+          tags=$(gh release list -R "$SOURCE_REPO" --exclude-drafts --exclude-pre-releases --limit 50 \
+            --json tagName --jq '.[].tagName')
+          new=0
+          # tag prefix | the APK to take | the GPL source that goes out with it
+          for spec in "slickrock-|Slickrock-*.apk|" \
+                      "retroarch-|RetroArch-for-Slickrock-*-arm64-v8a.apk|retroarch-for-slickrock-*.patch"; do
+            IFS='|' read -r prefix pattern patch <<< "$spec"
+            tag=$(printf '%s\n' "$tags" | grep -m1 "^${prefix}" || true)
+            if [ -z "$tag" ]; then continue; fi
+            dir=$(mktemp -d)
+            gh release download "$tag" -R "$SOURCE_REPO" -p "$pattern" -D "$dir"
+            for f in "$dir"/*.apk; do
+              [ -e "$f" ] || continue
+              name=$(basename "$f")
+              # already served, or already waiting to be vetted
+              if [ -e "fdroid/repo/$name" ] || [ -e "fdroid/incoming/$name" ]; then continue; fi
+              mv "$f" "fdroid/incoming/$name"
+              echo "fetched $name from $tag"
+              new=$((new + 1))
+              if [ -n "$patch" ]; then
+                gh release download "$tag" -R "$SOURCE_REPO" -p "$patch" -D source --skip-existing
+              fi
+            done
+          done
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to publish
+        id: go
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ steps.fetch.outputs.new }}" = "0" ]; then
+            echo "Nothing new in the Slickrock releases"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Java
+        if: steps.go.outputs.publish == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Python
+        if: steps.go.outputs.publish == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install fdroidserver
+        if: steps.go.outputs.publish == 'true'
         run: |
           python -m venv "$HOME/fdroid-venv"
           "$HOME/fdroid-venv/bin/pip" install --quiet --upgrade pip "setuptools<72" wheel
@@ -66,6 +125,7 @@ jobs:
 
       - name: Vet new APKs
         id: vet
+        if: steps.go.outputs.publish == 'true'
         working-directory: fdroid
         run: |
           set -euo pipefail
@@ -79,9 +139,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Commit the vetted APKs
+        if: steps.go.outputs.publish == 'true'
         run: |
           set -euo pipefail
-          git add -A fdroid/repo fdroid/incoming
+          git add -A fdroid/repo fdroid/incoming source
           if git diff --cached --quiet; then
             echo "No APK changes"
             exit 0
@@ -100,6 +161,7 @@ jobs:
           exit 1
 
       - name: Restore the index signing key
+        if: steps.go.outputs.publish == 'true'
         env:
           FDROID_KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_B64 }}
         run: |
@@ -108,6 +170,7 @@ jobs:
           printf '%s' "$FDROID_KEYSTORE_B64" | tr -d '\r\n' | base64 --decode > fdroid/keystore.p12
 
       - name: Build the signed index
+        if: steps.go.outputs.publish == 'true'
         working-directory: fdroid
         env:
           FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
@@ -126,6 +189,7 @@ jobs:
           PY
 
       - name: Assemble the site
+        if: steps.go.outputs.publish == 'true'
         run: |
           set -euo pipefail
           rm -rf _site
@@ -133,15 +197,38 @@ jobs:
           cp -r site/. _site/
           cp -r fdroid/repo _site/repo
           cp -r source _site/source
+          # The current build of each app under a fixed name, from the last part of its
+          # package: com.textrelay.relay -> relay.apk + relay.json
+          python3 - <<'PY'
+          import json, shutil
+          d = json.load(open("fdroid/repo/index-v2.json"))
+          for pkg, p in sorted(d["packages"].items()):
+              v = max(p["versions"].values(), key=lambda v: v["manifest"]["versionCode"])
+              short = pkg.rsplit(".", 1)[-1]
+              shutil.copyfile("fdroid/repo" + v["file"]["name"], "_site/" + short + ".apk")
+              info = {
+                  "app": p["metadata"]["name"].get("en-US", short),
+                  "package": pkg,
+                  "version": v["manifest"]["versionName"],
+                  "versionCode": v["manifest"]["versionCode"],
+                  "sha256": v["file"]["sha256"],
+                  "url": short + ".apk",
+              }
+              with open("_site/" + short + ".json", "w") as f:
+                  json.dump(info, f)
+              print(short + ".apk", "=", info["app"], info["version"])
+          PY
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
+        if: steps.go.outputs.publish == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
     needs: build
+    if: needs.build.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
