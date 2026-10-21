@@ -15,19 +15,20 @@ Description: |
   * Laid out like Google Messages: conversations, search, threads with search
     inside them, and each conversation's photos, files and links
   * A notification for each conversation as texts arrive, with no Google
-    services, push app or browser needed, or a quiet option with no sound or
-    pop-up
+    services, push app or browser needed; silent, or none at all, if you
+    prefer
   * New texts arrive within seconds over a light connection to the inbox,
     with a check once a minute as a backup
   * Warns you only when the relay phone has actually lost its connection, with
     a Reconnect button that asks it to come back
-  * Resync reloads every conversation and asks the relay phone to send what it
-    still has
+  * Pull down to refresh; Resync reloads every conversation and asks the relay
+    phone to send the last week again
+  * Shows how far the relay phone's full-history sync has got
   * Follows the system's light or dark theme
 
-  Install Relay on the phone that keeps the SIM, then pair Texts with a
-  one-time code from it: scan the QR code with this phone's camera, or type
-  the code.
+  Install Relay on the phone that keeps the SIM, then link Texts to it: in
+  Relay, tap Link a device, and in Texts, tap Scan QR code. No camera? Type
+  the code Relay shows instead.
 
 RequiresRoot: false
 

@@ -24,8 +24,9 @@ The address keeps its old name so the Sidephones that already have it keep worki
 | Texts | `com.textrelay.texts` | Built in the Text Relay project, put in `fdroid/incoming/` |
 
 Relay goes on the phone that keeps the SIM and Google Messages; Texts on the phone you
-carry. Each pairs with a one-time code made in the other (Texts: Settings, Pair the relay
-device; Relay: Pair a phone with Texts).
+carry. Relay makes the one-time linking codes and Texts scans them with its own scanner:
+Relay, Link a device, then Scan QR code in Texts. A relay phone that isn't connected yet
+shows its own code, which Texts scans under Settings, Connect a relay phone.
 
 The current build of each app is also at a fixed address for direct download, with its
 version in a `.json` of the same name: `slickrock.apk`, `retroarch.apk`, `tileshift.apk`,
@@ -96,5 +97,5 @@ tools/publish-to-app-pack.ps1     what it runs
 Slickrock Station, Tyle, Relay and Texts are Brad White's own apps and are not open
 source. RetroArch is GPL-3.0; the changes in the build carried here are published in
 `source/`. Relay and Texts include Java-WebSocket, under the MIT licence in
-`licenses/Java-WebSocket.txt`; Relay also includes ZXing's QR code library, under the
-Apache License 2.0 in `licenses/ZXing.txt`.
+`licenses/Java-WebSocket.txt`, and ZXing's QR code library, under the Apache License 2.0 in
+`licenses/ZXing.txt`.
