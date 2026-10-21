@@ -30,6 +30,8 @@ Description: |
 
   * Private: texts, names and pictures are encrypted on the relay phone and
     opened only here; the server can't read them
+  * Connect through Tor, with Orbot, so the inbox server never sees this
+    phone's IP address
 
   Install Paigr Relay on the phone that keeps the SIM and open it: it shows a
   code. In Paigr, tap Scan code and point it at the code. That's all: the two

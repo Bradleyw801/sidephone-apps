@@ -32,13 +32,15 @@ Description: |
     when this one has lost its connection, and ask it to reconnect
   * Link a device shows a one-time code for another phone or a browser
   * Reinstalled on the same phone, it gets back into its inbox by itself;
-    a new relay phone takes over when the linked Texts scans its code
+    a new relay phone takes over when the linked Paigr scans its code
   * A guide for leaving this phone at home: what to check, how to forward
     calls (call settings first, carrier codes as a fallback), and how to link
     the phone you carry
   * Optional SMS fallback, for replies to a one-to-one conversation when
     Messages has no reply handle open
   * A silent status notification, or none at all
+  * Connect through Tor, with Orbot, so the inbox server never sees this
+    phone's IP address
 
   Paigr Relay reads Messages' notifications, so it needs notification access, and
   Messages notifications must stay on (they can be silent): encrypted RCS
