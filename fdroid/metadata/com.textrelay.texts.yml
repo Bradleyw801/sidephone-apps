@@ -3,10 +3,10 @@ Categories:
 License: Proprietary
 AuthorName: Brad White
 WebSite: https://bradleyw801.github.io/sidephone-apps/
-Name: Texts
+Name: Paigr
 Summary: Read and answer your texts, RCS included, on a phone without Google services
 Description: |
-  Texts is the inbox half of Text Relay. It runs on the phone you carry, which
+  Paigr is the inbox half of Paigr and Paigr Relay. It runs on the phone you carry, which
   can be any Android phone, including one with no Google services at all. Every
   conversation the relay phone receives shows up here, group chats and
   full-size pictures included, and your replies go out from the relay phone's
@@ -31,11 +31,11 @@ Description: |
   * Private: texts, names and pictures are encrypted on the relay phone and
     opened only here; the server can't read them
 
-  Install Relay on the phone that keeps the SIM and open it: it shows a code.
-  In Texts, tap Scan code and point it at the code. That's all: the two
+  Install Paigr Relay on the phone that keeps the SIM and open it: it shows a
+  code. In Paigr, tap Scan code and point it at the code. That's all: the two
   phones get their own private inbox, with no account, email or password. No
-  camera? Type the code Relay shows instead. Reinstalled on the same phone,
-  Texts gets back into its inbox by itself.
+  camera? Type the code Paigr Relay shows instead. Reinstalled on the same
+  phone, Paigr gets back into its inbox by itself.
 
 RequiresRoot: false
 

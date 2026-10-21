@@ -20,14 +20,14 @@ The address keeps its old name so the Sidephones that already have it keep worki
 | Slickrock Station | `com.bradwhite.slickrock` | The newest release of [slickrock-releases](https://github.com/Bradleyw801/slickrock-releases), fetched by the workflow |
 | RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | The arm64-v8a build of the newest release of [slickrock-releases](https://github.com/Bradleyw801/slickrock-releases), with its patch in `source/` |
 | Tyle | `app.tileshift` | Built in the Sidephone project, sent with `PUBLISH-TO-APP-PACK.cmd` |
-| Relay | `com.textrelay.relay` | Built in the Text Relay project, put in `fdroid/incoming/` |
-| Texts | `com.textrelay.texts` | Built in the Text Relay project, put in `fdroid/incoming/` |
+| Paigr Relay | `com.textrelay.relay` | Built in the Paigr project, put in `fdroid/incoming/` |
+| Paigr | `com.textrelay.texts` | Built in the Paigr project, put in `fdroid/incoming/` |
 
-Relay goes on the phone that keeps the SIM and Google Messages; Texts on the phone you
-carry. Setting up takes one scan: Relay shows a code when it opens, and Texts scans it (Scan
-QR code). The two phones get their own private, end-to-end encrypted inbox on the shared
-server, with no account or password. More devices join with Relay's Link a device; a new
-relay phone takes over when the linked Texts scans its code; and reinstalled on the same
+Paigr Relay goes on the phone that keeps the SIM and Google Messages; Paigr on the phone
+you carry. Setting up takes one scan: Paigr Relay shows a code when it opens, and Paigr
+scans it (Scan code). The two phones get their own private, end-to-end encrypted inbox on the shared
+server, with no account or password. More devices join with Paigr Relay's Link a device; a
+new relay phone takes over when the linked Paigr scans its code; and reinstalled on the same
 phone, either app gets back in by itself.
 
 The current build of each app is also at a fixed address for direct download, with its
@@ -44,12 +44,12 @@ version in a `.json` of the same name: `slickrock.apk`, `retroarch.apk`, `tilesh
 - **Tyle:** on Brad's PC, double-click `PUBLISH-TO-APP-PACK.cmd` in
   `Downloads\Personal\Devices\Sidephone`. It finds the newest Tyle build, sends it if the
   pack doesn't already serve it, and waits until it is live.
-- **Relay and Texts, or by hand:** put the APK in `fdroid/incoming/`, by `git push` or with
+- **Paigr, Paigr Relay, or by hand:** put the APK in `fdroid/incoming/`, by `git push` or with
   "Add file, Upload files" on GitHub (up to 25 MB a file). Bigger files go in as pieces,
   which the workflow joins:
 
   ```
-  split -b 9000000 -d -a 2 Relay-0.7.apk Relay-0.7.apk.part
+  split -b 9000000 -d -a 2 Paigr-Relay-1.1.apk Paigr-Relay-1.1.apk.part
   ```
 
 Every new build is vetted before it goes out. It must be signed with the key pinned for
@@ -96,8 +96,8 @@ tools/publish-to-app-pack.ps1     what it runs
 
 ## Licences
 
-Slickrock Station, Tyle, Relay and Texts are Brad White's own apps and are not open
+Slickrock Station, Tyle, Paigr and Paigr Relay are Brad White's own apps and are not open
 source. RetroArch is GPL-3.0; the changes in the build carried here are published in
-`source/`. Relay and Texts include Java-WebSocket, under the MIT licence in
+`source/`. Paigr and Paigr Relay include Java-WebSocket, under the MIT licence in
 `licenses/Java-WebSocket.txt`, and ZXing's QR code library, under the Apache License 2.0 in
 `licenses/ZXing.txt`.

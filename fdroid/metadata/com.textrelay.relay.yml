@@ -3,17 +3,17 @@ Categories:
 License: Proprietary
 AuthorName: Brad White
 WebSite: https://bradleyw801.github.io/sidephone-apps/
-Name: Relay
-Summary: Forwards every text on this phone, RCS included, to your Text Relay inbox
+Name: Paigr Relay
+Summary: Forwards every text on this phone, RCS included, to your Paigr inbox
 Description: |
-  Relay runs on the phone that keeps your SIM and Google Messages. Every text
-  that reaches Messages (SMS, MMS and RCS, one-to-one and group) goes to your
-  Text Relay inbox, where the Texts app on your other phone reads it. Replies
+  Paigr Relay runs on the phone that keeps your SIM and Google Messages. Every
+  text that reaches Messages (SMS, MMS and RCS, one-to-one and group) goes to
+  your inbox, where the Paigr app on your other phone reads it. Replies
   written there go back out through Messages from this phone's number, so RCS
   conversations stay RCS.
 
-  Setting up takes one scan: open Relay and it shows a code; scan it with
-  Texts on your other phone. The two phones get their own private inbox, with
+  Setting up takes one scan: open Paigr Relay and it shows a code; scan it
+  with Paigr on your other phone. The two phones get their own private inbox, with
   no account, email or password. Texts, names and pictures are encrypted on
   this phone before they leave it, and only your phones can read them; the
   server stores what it can't read.
@@ -40,7 +40,7 @@ Description: |
     Messages has no reply handle open
   * A silent status notification, or none at all
 
-  Relay reads Messages' notifications, so it needs notification access, and
+  Paigr Relay reads Messages' notifications, so it needs notification access, and
   Messages notifications must stay on (they can be silent): encrypted RCS
   conversations come through from those notifications only. Leave the phone
   on Wi-Fi and a charger.
