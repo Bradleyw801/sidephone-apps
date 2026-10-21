@@ -26,7 +26,8 @@ The address keeps its old name so the Sidephones that already have it keep worki
 Relay goes on the phone that keeps the SIM and Google Messages; Texts on the phone you
 carry. Relay makes the one-time linking codes and Texts scans them with its own scanner:
 Relay, Link a device, then Scan QR code in Texts. A relay phone that isn't connected yet
-shows its own code, which Texts scans under Settings, Connect a relay phone.
+shows its own code, which Texts scans under Settings, Connect a relay phone. Reinstalled on a
+phone it was linked on before, either app reconnects by itself.
 
 The current build of each app is also at a fixed address for direct download, with its
 version in a `.json` of the same name: `slickrock.apk`, `retroarch.apk`, `tileshift.apk`,
