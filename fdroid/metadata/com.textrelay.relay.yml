@@ -12,6 +12,12 @@ Description: |
   written there go back out through Messages from this phone's number, so RCS
   conversations stay RCS.
 
+  Setting up takes one scan: open Relay and it shows a code; scan it with
+  Texts on your other phone. The two phones get their own private inbox, with
+  no account, email or password. Texts, names and pictures are encrypted on
+  this phone before they leave it, and only your phones can read them; the
+  server stores what it can't read.
+
   * Names, group chats and full-size pictures come through as Messages
     shows them
   * With message access, texts sent from this phone, conversations read here
@@ -23,7 +29,9 @@ Description: |
     the inbox has them, and the inbox keeps one copy of each however it came
   * Checks in with the inbox every minute, so your other phone can warn you
     when this one has lost its connection, and ask it to reconnect
-  * Link a device shows a one-time QR code for the Texts scanner
+  * Link a device shows a one-time code for another phone or a browser
+  * Reinstalled on the same phone, it gets back into its inbox by itself;
+    a new relay phone takes over when the linked Texts scans its code
   * A guide for leaving this phone at home: what to check, how to forward
     calls (call settings first, carrier codes as a fallback), and how to link
     the phone you carry

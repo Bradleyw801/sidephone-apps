@@ -24,10 +24,11 @@ The address keeps its old name so the Sidephones that already have it keep worki
 | Texts | `com.textrelay.texts` | Built in the Text Relay project, put in `fdroid/incoming/` |
 
 Relay goes on the phone that keeps the SIM and Google Messages; Texts on the phone you
-carry. Relay makes the one-time linking codes and Texts scans them with its own scanner:
-Relay, Link a device, then Scan QR code in Texts. A relay phone that isn't connected yet
-shows its own code, which Texts scans under Settings, Connect a relay phone. Reinstalled on a
-phone it was linked on before, either app reconnects by itself.
+carry. Setting up takes one scan: Relay shows a code when it opens, and Texts scans it (Scan
+QR code). The two phones get their own private, end-to-end encrypted inbox on the shared
+server, with no account or password. More devices join with Relay's Link a device; a new
+relay phone takes over when the linked Texts scans its code; and reinstalled on the same
+phone, either app gets back in by itself.
 
 The current build of each app is also at a fixed address for direct download, with its
 version in a `.json` of the same name: `slickrock.apk`, `retroarch.apk`, `tileshift.apk`,

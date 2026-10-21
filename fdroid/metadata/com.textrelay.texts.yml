@@ -26,9 +26,14 @@ Description: |
   * Shows how far the relay phone's full-history sync has got
   * Follows the system's light or dark theme
 
-  Install Relay on the phone that keeps the SIM, then link Texts to it: in
-  Relay, tap Link a device, and in Texts, tap Scan QR code. No camera? Type
-  the code Relay shows instead.
+  * Private: texts, names and pictures are encrypted on the relay phone and
+    opened only here; the server can't read them
+
+  Install Relay on the phone that keeps the SIM and open it: it shows a code.
+  In Texts, tap Scan QR code and point it at the code. That's all: the two
+  phones get their own private inbox, with no account, email or password. No
+  camera? Type the code Relay shows instead. Reinstalled on the same phone,
+  Texts gets back into its inbox by itself.
 
 RequiresRoot: false
 
