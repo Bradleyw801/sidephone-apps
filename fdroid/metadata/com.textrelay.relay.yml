@@ -18,6 +18,7 @@ Description: |
   this phone before they leave it, and only your phones can read them; the
   server stores what it can't read.
 
+  * One screen: how it's doing in a word, and only what it still needs
   * Names, group chats and full-size pictures come through as Messages
     shows them
   * With message access, texts sent from this phone, conversations read here

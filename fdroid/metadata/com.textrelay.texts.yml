@@ -12,8 +12,11 @@ Description: |
   full-size pictures included, and your replies go out from the relay phone's
   number.
 
-  * Laid out like Google Messages: conversations, search, threads with search
-    inside them, and each conversation's photos, files and links
+  * A native app made for small screens: it opens at once with the texts it
+    already has, and works by touch or with a keypad's arrows and OK
+  * Each conversation in its own colour, light or dark with the system;
+    threads with search inside them, and each conversation's photos, files
+    and links
   * A notification for each conversation as texts arrive, with no Google
     services, push app or browser needed; silent, or none at all, if you
     prefer
@@ -24,13 +27,12 @@ Description: |
   * Pull down to refresh; Resync reloads every conversation and asks the relay
     phone to send the last week again
   * Shows how far the relay phone's full-history sync has got
-  * Follows the system's light or dark theme
 
   * Private: texts, names and pictures are encrypted on the relay phone and
     opened only here; the server can't read them
 
   Install Relay on the phone that keeps the SIM and open it: it shows a code.
-  In Texts, tap Scan QR code and point it at the code. That's all: the two
+  In Texts, tap Scan code and point it at the code. That's all: the two
   phones get their own private inbox, with no account, email or password. No
   camera? Type the code Relay shows instead. Reinstalled on the same phone,
   Texts gets back into its inbox by itself.
