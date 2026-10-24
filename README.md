@@ -26,7 +26,9 @@ The address keeps its old name so the Sidephones that already have it keep worki
 Paigr Relay goes on the phone that keeps the SIM and Google Messages; Paigr on the phone
 you carry. Setting up takes one scan: Paigr Relay shows a code when it opens, and Paigr
 scans it (Scan code). The two phones get their own private, end-to-end encrypted inbox on the shared
-server, with no account or password. Both apps can connect through Tor, with Orbot. More devices join with Paigr Relay's Link a device; a
+server, with no account or password. Reactions, quoted replies and attachments work both ways: they travel as the
+texts and files Messages already understands, and attachments sent from Paigr go out from the relay phone as MMS
+when Messages won't take them itself. Both apps can connect through Tor, with Orbot. More devices join with Paigr Relay's Link a device; a
 new relay phone takes over when the linked Paigr scans its code; and reinstalled on the same
 phone, either app gets back in by itself.
 

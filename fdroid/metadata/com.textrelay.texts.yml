@@ -17,6 +17,10 @@ Description: |
   * Each conversation in its own colour, light or dark with the system;
     threads with search inside them, and each conversation's photos, files
     and links
+  * React to a message with an emoji, reply to one message and quote it, and
+    send pictures, GIFs and files from this phone, with an emoji keyboard in
+    the composer; reactions and quoted replies from the other side show as
+    what they are
   * A notification for each conversation as texts arrive, with no Google
     services, push app or browser needed; silent, or none at all, if you
     prefer

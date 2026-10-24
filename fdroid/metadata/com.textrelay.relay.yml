@@ -37,7 +37,9 @@ Description: |
     calls (call settings first, carrier codes as a fallback), and how to link
     the phone you carry
   * Optional SMS fallback, for replies to a one-to-one conversation when
-    Messages has no reply handle open
+    Messages has no reply handle open; with it, pictures and files sent from
+    Paigr go out from this phone as MMS, shrunk to the carrier's limits, and
+    show in Messages like anything else this phone sent
   * A silent status notification, or none at all
   * Connect through Tor, with Orbot, so the inbox server never sees this
     phone's IP address
