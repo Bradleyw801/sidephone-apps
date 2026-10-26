@@ -28,6 +28,11 @@ Description: |
     prefer
   * New texts arrive within seconds over a light connection to the inbox,
     with a check once a minute as a backup
+  * Keeps listening while the phone sleeps: a wake-up every quarter of an hour
+    even in doze, a fresh connection the moment the network changes, and a
+    one-tap "Allow background use" so Android never cuts it off; a text in
+    another conversation is announced even while the app is open
+  * Mark one conversation or all of them as read from the list
   * Warns you only when the relay phone has actually lost its connection, with
     a Reconnect button that asks it to come back
   * Pull down to refresh; Resync reloads every conversation and asks the relay
