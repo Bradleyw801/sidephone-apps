@@ -18,7 +18,9 @@ Description: |
   already has, and it works with touch or with a keypad's arrows and OK.
   Each conversation gets its own colour. You can search inside a thread, see
   a conversation's photos, files and links, react with an emoji, quote a
-  message in your reply, and send pictures, GIFs and files.
+  message in your reply, and send pictures, GIFs and files. New message
+  starts a conversation with any number; the relay phone sends the first
+  text as SMS.
 
   You get a notification for each conversation as texts come in, with no
   Google services or push app needed. New texts show up within seconds, and

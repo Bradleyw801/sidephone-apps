@@ -32,8 +32,9 @@ Description: |
   back into your inbox by itself.
 
   Turn on SMS fallback and replies can still go out when Messages has
-  nothing to reply to. Pictures and files you send from Paigr then go out
-  from this phone as MMS. You can also connect through Tor with Orbot, so
+  nothing to reply to, and texts to a new number start as SMS from this
+  phone. Pictures and files you send from Paigr then go out from this phone
+  as MMS. You can also connect through Tor with Orbot, so
   the inbox server never sees this phone's IP address.
 
   Paigr Relay reads Messages' notifications, so it needs notification
