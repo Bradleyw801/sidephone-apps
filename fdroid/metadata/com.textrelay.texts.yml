@@ -6,49 +6,35 @@ WebSite: https://bradleyw801.github.io/sidephone-apps/
 SourceCode: https://github.com/Bradleyw801/paigr
 IssueTracker: https://github.com/Bradleyw801/paigr/issues
 Name: Paigr
-Summary: Read and answer your texts, RCS included, on a phone without Google services
+Summary: Read and answer your texts, RCS included, on any Android phone
 Description: |
-  Paigr is the inbox half of Paigr and Paigr Relay. It runs on the phone you carry, which
-  can be any Android phone, including one with no Google services at all. Every
-  conversation the relay phone receives shows up here, group chats and
-  full-size pictures included, and your replies go out from the relay phone's
-  number.
+  Paigr is where you read and answer your texts. It runs on the phone you
+  carry, which can be any Android phone, even one with no Google services.
+  Paigr Relay, on the phone with your SIM, sends it every conversation,
+  including group chats and full-size pictures, and your replies go out from
+  your real number.
 
-  * A native app made for small screens: it opens at once with the texts it
-    already has, and works by touch or with a keypad's arrows and OK
-  * Each conversation in its own colour, light or dark with the system;
-    threads with search inside them, and each conversation's photos, files
-    and links
-  * React to a message with an emoji, reply to one message and quote it, and
-    send pictures, GIFs and files from this phone, with an emoji keyboard in
-    the composer; reactions and quoted replies from the other side show as
-    what they are
-  * A notification for each conversation as texts arrive, with no Google
-    services, push app or browser needed; silent, or none at all, if you
-    prefer
-  * New texts arrive within seconds over a light connection to the inbox,
-    with a check once a minute as a backup
-  * Keeps listening while the phone sleeps: a wake-up every quarter of an hour
-    even in doze, a fresh connection the moment the network changes, and a
-    one-tap "Allow background use" so Android never cuts it off; a text in
-    another conversation is announced even while the app is open
-  * Mark one conversation or all of them as read from the list
-  * Warns you only when the relay phone has actually lost its connection, with
-    a Reconnect button that asks it to come back
-  * Pull down to refresh; Resync reloads every conversation and asks the relay
-    phone to send the last week again
-  * Shows how far the relay phone's full-history sync has got
+  It's a native app made for small screens. It opens fast with the texts it
+  already has, and it works with touch or with a keypad's arrows and OK.
+  Each conversation gets its own colour. You can search inside a thread, see
+  a conversation's photos, files and links, react with an emoji, quote a
+  message in your reply, and send pictures, GIFs and files.
 
-  * Private: texts, names and pictures are encrypted on the relay phone and
-    opened only here; the server can't read them
-  * Connect through Tor, with Orbot, so the inbox server never sees this
-    phone's IP address
+  You get a notification for each conversation as texts come in, with no
+  Google services or push app needed. New texts show up within seconds, and
+  Paigr keeps listening while the phone sleeps. If the relay phone loses its
+  connection, Paigr tells you and gives you a button to reconnect it. Pull
+  down to refresh, or use Resync to reload everything and have the relay
+  phone send the last week again.
 
-  Install Paigr Relay on the phone that keeps the SIM and open it: it shows a
-  code. In Paigr, tap Scan code and point it at the code. That's all: the two
-  phones get their own private inbox, with no account, email or password. No
-  camera? Type the code Paigr Relay shows instead. Reinstalled on the same
-  phone, Paigr gets back into its inbox by itself.
+  Your texts, names and pictures are encrypted on the relay phone and only
+  opened here, so the server can't read them. You can also connect through
+  Tor with Orbot.
+
+  To set it up, install Paigr Relay on the phone with your SIM and open it.
+  It shows a code. In Paigr, tap Scan code and point it at that code. No
+  camera? Type the code in instead. If you reinstall Paigr on the same
+  phone, it gets back into your inbox by itself.
 
 RequiresRoot: false
 

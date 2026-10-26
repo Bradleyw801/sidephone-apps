@@ -7,10 +7,9 @@
 repo_url: https://bradleyw801.github.io/sidephone-apps/repo
 repo_name: Brad White's apps
 repo_description: >-
-  Apps by Brad White: Slickrock Station and the RetroArch build it launches, Tyle for
-  the Sidephone SP-01's keypad tiles, and Relay and Texts, which carry every text from
-  one phone to another. Add this repository to F-Droid, Droid-ify or the Sidephone's
-  App Library and the apps install and update from here.
+  The Android apps I have built: Slickrock Station and its RetroArch build, Tyle for
+  the Sidephone, and Paigr and Paigr Relay for reading your texts on another phone.
+  Install them from here and their updates come through the same way.
 repo_icon: icon.png
 
 # No archive repo: the newest version of each app is what gets served.

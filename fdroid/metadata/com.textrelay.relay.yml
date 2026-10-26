@@ -6,50 +6,39 @@ WebSite: https://bradleyw801.github.io/sidephone-apps/
 SourceCode: https://github.com/Bradleyw801/paigr
 IssueTracker: https://github.com/Bradleyw801/paigr/issues
 Name: Paigr Relay
-Summary: Forwards every text on this phone, RCS included, to your Paigr inbox
+Summary: Sends this phone's texts, RCS included, to Paigr on your other phone
 Description: |
-  Paigr Relay runs on the phone that keeps your SIM and Google Messages. Every
-  text that reaches Messages (SMS, MMS and RCS, one-to-one and group) goes to
-  your inbox, where the Paigr app on your other phone reads it. Replies
-  written there go back out through Messages from this phone's number, so RCS
-  conversations stay RCS.
+  Paigr Relay goes on the phone that has your SIM and Google Messages. Every
+  text that phone gets goes to your inbox, where Paigr on your other phone
+  shows it. That's SMS, MMS and RCS, one-to-one and group chats, with names
+  and full-size pictures. Replies you write in Paigr go back out through
+  Messages from your number, so RCS chats stay RCS.
 
-  Setting up takes one scan: open Paigr Relay and it shows a code; scan it
-  with Paigr on your other phone. The two phones get their own private inbox, with
-  no account, email or password. Texts, names and pictures are encrypted on
-  this phone before they leave it, and only your phones can read them; the
-  server stores what it can't read.
+  Setup is one scan. Open Paigr Relay and it shows a code. Scan it with
+  Paigr on your other phone and you're done. There's no account, email or
+  password. Your texts, names and pictures are encrypted on this phone
+  before they leave it, so the server can't read them.
 
-  * One screen: how it's doing in a word, and only what it still needs
-  * Names, group chats and full-size pictures come through as Messages
-    shows them
-  * With message access, texts sent from this phone, conversations read here
-    and anything a notification missed reach the inbox too, checked every few
-    seconds after a change and every 15 minutes in full
-  * Full history: every conversation on the phone, text only or with old
-    pictures and videos; new ones always come through either way
-  * Nothing is lost while the phone is offline: texts wait on the phone until
-    the inbox has them, and the inbox keeps one copy of each however it came
-  * Checks in with the inbox every minute, so your other phone can warn you
-    when this one has lost its connection, and ask it to reconnect
-  * Link a device shows a one-time code for another phone or a browser
-  * Reinstalled on the same phone, it gets back into its inbox by itself;
-    a new relay phone takes over when the linked Paigr scans its code
-  * A guide for leaving this phone at home: what to check, how to forward
-    calls (call settings first, carrier codes as a fallback), and how to link
-    the phone you carry
-  * Optional SMS fallback, for replies to a one-to-one conversation when
-    Messages has no reply handle open; with it, pictures and files sent from
-    Paigr go out from this phone as MMS, shrunk to the carrier's limits, and
-    show in Messages like anything else this phone sent
-  * A silent status notification, or none at all
-  * Connect through Tor, with Orbot, so the inbox server never sees this
-    phone's IP address
+  If the phone goes offline, texts wait here until the inbox has them, and
+  the inbox only ever keeps one copy of each. With message access turned on,
+  Paigr Relay also picks up texts you send from this phone and anything a
+  notification missed, and it can send your whole history. It checks in
+  every minute, so Paigr can warn you if this phone drops off and ask it to
+  reconnect.
 
-  Paigr Relay reads Messages' notifications, so it needs notification access, and
-  Messages notifications must stay on (they can be silent): encrypted RCS
-  conversations come through from those notifications only. Leave the phone
-  on Wi-Fi and a charger.
+  If you're leaving this phone at home, there's a guide for that, including
+  how to forward your calls. You can link another phone or a browser with
+  Link a device, and if you reinstall Paigr Relay on the same phone it gets
+  back into your inbox by itself.
+
+  Turn on SMS fallback and replies can still go out when Messages has
+  nothing to reply to. Pictures and files you send from Paigr then go out
+  from this phone as MMS. You can also connect through Tor with Orbot, so
+  the inbox server never sees this phone's IP address.
+
+  Paigr Relay reads Messages' notifications, so it needs notification
+  access, and Messages notifications have to stay on (they can be silent).
+  Keep the phone on Wi-Fi and plugged in.
 
 RequiresRoot: false
 

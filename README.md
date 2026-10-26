@@ -1,106 +1,88 @@
 # Brad White's apps
 
-An F-Droid-format repository, served from GitHub Pages, for every app Brad White publishes.
-Scan the QR code once in F-Droid, Droid-ify or the Sidephone's App Library (an F-Droid
-client), then install and update the apps from there.
+These are the Android apps I have built, in one F-Droid repository. Add it to F-Droid, Droid-ify or any other
+F-Droid client and you can install the apps and get their updates from there.
 
-Install page and QR code: https://bradleyw801.github.io/sidephone-apps/
+The install page has the QR code: https://bradleyw801.github.io/sidephone-apps/
 
 | | |
 | --- | --- |
-| Repository address | `https://bradleyw801.github.io/sidephone-apps/repo` |
+| Address | `https://bradleyw801.github.io/sidephone-apps/repo` |
 | Fingerprint | `297A48B6E4BE5C0701771CE758E54D7885C3E342FFC46FE28247FA5038E1DAC6` |
 
-The address keeps its old name so the Sidephones that already have it keep working.
+## The apps
 
-## Apps
-
-| App | Package | Where the build comes from |
+| App | Package | What it's for |
 | --- | --- | --- |
-| Slickrock Station | `com.bradwhite.slickrock` | The newest release of [slickrock-releases](https://github.com/Bradleyw801/slickrock-releases), fetched by the workflow |
-| RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | The arm64-v8a build of the newest release of [slickrock-releases](https://github.com/Bradleyw801/slickrock-releases), with its patch in `source/` |
-| Tyle | `app.tileshift` | Built in the Sidephone project, sent with `PUBLISH-TO-APP-PACK.cmd` |
-| Paigr Relay | `com.textrelay.relay` | Built from [Bradleyw801/paigr](https://github.com/Bradleyw801/paigr) (Apache-2.0), put in `fdroid/incoming/` |
-| Paigr | `com.textrelay.texts` | Built from [Bradleyw801/paigr](https://github.com/Bradleyw801/paigr) (Apache-2.0), put in `fdroid/incoming/` |
+| Slickrock Station | `com.bradwhite.slickrock` | A game launcher that sets up RetroArch for you, for physical keys, a controller or a touchscreen |
+| RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | The RetroArch build Slickrock Station runs, with a few input patches |
+| Tyle | `app.tileshift` | Different settings for each of the Sidephone's keypad tiles |
+| Paigr Relay | `com.textrelay.relay` | Sends the texts from the phone with your SIM to your Paigr inbox |
+| Paigr | `com.textrelay.texts` | Reads and answers those texts on another phone |
 
-Paigr Relay goes on the phone that keeps the SIM and Google Messages; Paigr on the phone
-you carry. Setting up takes one scan: Paigr Relay shows a code when it opens, and Paigr
-scans it (Scan code). The two phones get their own private, end-to-end encrypted inbox on the shared
-server, with no account or password. Reactions, quoted replies and attachments work both ways: they travel as the
-texts and files Messages already understands, and attachments sent from Paigr go out from the relay phone as MMS
-when Messages won't take them itself. Both apps can connect through Tor, with Orbot, and the inbox server can be run at home
-(source, the apps and a ready-made Docker image: [Bradleyw801/paigr](https://github.com/Bradleyw801/paigr)). More devices join with Paigr Relay's Link a device; a
-new relay phone takes over when the linked Paigr scans its code; and reinstalled on the same
-phone, either app gets back in by itself.
-
-The current build of each app is also at a fixed address for direct download, with its
-version in a `.json` of the same name: `slickrock.apk`, `retroarch.apk`, `tileshift.apk`,
-`relay.apk` and `texts.apk` under https://bradleyw801.github.io/sidephone-apps/.
+If you'd rather skip F-Droid, each app's current build is also at a fixed address: `slickrock.apk`, `retroarch.apk`,
+`tileshift.apk`, `relay.apk` and `texts.apk` under https://bradleyw801.github.io/sidephone-apps/. A `.json` file with
+the same name has the version.
 
 ## Publishing a new version
 
-- **Slickrock Station and RetroArch for Slickrock:** publish a release on
-  slickrock-releases (tag `slickrock-<version>` or `retroarch-<version>`, notes with a
-  `versionCode: N` line). The "Publish repository" workflow checks those releases every
-  hour and on every run, and takes the newest build the pack does not already serve. For
-  RetroArch it takes the arm64-v8a APK and the release's `.patch` into `source/`.
-- **Tyle:** on Brad's PC, double-click `PUBLISH-TO-APP-PACK.cmd` in
-  `Downloads\Personal\Devices\Sidephone`. It finds the newest Tyle build, sends it if the
-  pack doesn't already serve it, and waits until it is live.
-- **Paigr, Paigr Relay, or by hand:** put the APK in `fdroid/incoming/`, by `git push` or with
-  "Add file, Upload files" on GitHub (up to 25 MB a file). Bigger files go in as pieces,
-  which the workflow joins:
+Slickrock Station and RetroArch for Slickrock come from
+[slickrock-releases](https://github.com/Bradleyw801/slickrock-releases). Publish a release there, tagged
+`slickrock-<version>` or `retroarch-<version>`, with a `versionCode: N` line in the notes. The workflow looks for new
+releases every hour. For RetroArch it takes the arm64-v8a APK and copies the release's `.patch` into `source/`.
 
-  ```
-  split -b 9000000 -d -a 2 Paigr-Relay-1.1.apk Paigr-Relay-1.1.apk.part
-  ```
-
-Every new build is vetted before it goes out. It must be signed with the key pinned for
-that app in `fdroid/metadata/<package>.yml` (`AllowedAPKSigningKeys`) and have a higher
-version code than the published build. A build that passes replaces the old one, and the
-workflow signs a fresh index and deploys it with the install page. A build that fails is
-deleted and the run fails, with the reason on the run's page; everything else is still
-published. The workflow can also be started by hand from the Actions tab.
-
-Edit `fdroid/metadata/<package>.yml` only if the description should change. The name,
-version and icon come from the APK and from `fdroid/metadata/<package>/en-US/icon.png`.
-A new app needs its own `fdroid/metadata/<package>.yml` with its signing key pinned, and
-its icon, before its first build is sent.
-
-Phones that have the repository get each update on their F-Droid client's next refresh.
-
-## Secrets and keys
-
-The index is signed with `keystore.p12` (alias `sidephone`). The keystore is not in git:
-the workflow restores it from the `FDROID_KEYSTORE_B64` secret and reads the passwords
-from `FDROID_KEYSTORE_PASS` and `FDROID_KEY_PASS`. Keep a copy of the keystore and its
-passwords outside GitHub; if the key is lost, every phone has to remove and re-add the
-repository under a new fingerprint.
-
-Each app has its own signing key, kept with that app's project. The repository key only
-signs the index.
-
-## Layout
+Tyle, Paigr and Paigr Relay go in `fdroid/incoming/`, either with `git push` or with "Add file, Upload files" on
+GitHub. GitHub's web upload takes files up to 25 MB. A bigger file can go in as pieces and the workflow puts them back
+together:
 
 ```
-fdroid/config.yml                 repository name, address, key settings (no secrets)
-fdroid/metadata/<package>.yml     name, summary, description, licence, pinned signing key
+split -b 9000000 -d -a 2 Paigr-Relay-1.1.apk Paigr-Relay-1.1.apk.part
+```
+
+There's also a Windows script for Tyle, `tools/PUBLISH-TO-APP-PACK.cmd`, that sends the newest build from a PC and
+waits until it's live.
+
+Every build gets checked before it goes out. It has to be signed with the key pinned for its app in
+`fdroid/metadata/<package>.yml` (`AllowedAPKSigningKeys`), and its version code has to be higher than the one already
+published. If it passes, it replaces the old build, and the workflow signs a new index and deploys it with the install
+page. If it fails, it gets deleted and the run fails with the reason on the run's page. You can also run the workflow
+by hand from the Actions tab.
+
+The name, version and icon come from the APK and from `fdroid/metadata/<package>/en-US/icon.png`, so the `.yml` only
+needs editing when the description changes. A new app needs its `.yml`, with its signing key pinned, and an icon
+before its first build goes in.
+
+Phones get the update the next time their F-Droid client refreshes.
+
+## Keys
+
+The index is signed with `keystore.p12` (alias `sidephone`), which isn't in git. The workflow restores it from the
+`FDROID_KEYSTORE_B64` secret and reads its passwords from `FDROID_KEYSTORE_PASS` and `FDROID_KEY_PASS`. Keep a copy of
+the keystore and passwords somewhere other than GitHub. If the key is ever lost, every phone has to remove the
+repository and add it again with a new fingerprint.
+
+Each app has its own signing key, kept with that app's project. The repository key only signs the index.
+
+## What's where
+
+```
+fdroid/config.yml                 repository name, address and key settings (no secrets)
+fdroid/metadata/<package>.yml     each app's name, summary, description, licence and pinned key
 fdroid/metadata/<package>/en-US/icon.png
 fdroid/repo/*.apk                 the apps
-fdroid/incoming/                  new builds waiting to be vetted (normally empty)
-site/                             install page and QR code
-source/                           patches for the GPL apps carried here
-licenses/                         licences of code the apps include
-tools/intake.py                   vets new builds (run by the workflow)
-tools/PUBLISH-TO-APP-PACK.cmd     the PC publisher for Tyle (copy of the one in Downloads\Personal\Devices\Sidephone)
-tools/publish-to-app-pack.ps1     what it runs
-.github/workflows/publish.yml     fetches Slickrock releases, vets, builds the index and deploys GitHub Pages
+fdroid/incoming/                  new builds waiting to be checked (normally empty)
+site/                             the install page and QR code
+source/                           patches for the GPL apps served here
+licenses/                         licences for code the apps include
+tools/intake.py                   checks new builds (the workflow runs it)
+tools/PUBLISH-TO-APP-PACK.cmd     sends a new Tyle build from a Windows PC
+tools/publish-to-app-pack.ps1     the script it runs
+.github/workflows/publish.yml     fetches Slickrock releases, checks new builds, signs the index and deploys the site
 ```
 
 ## Licences
 
-Slickrock Station, Tyle, Paigr and Paigr Relay are Brad White's own apps and are not open
-source. RetroArch is GPL-3.0; the changes in the build carried here are published in
-`source/`. Paigr and Paigr Relay include Java-WebSocket, under the MIT licence in
-`licenses/Java-WebSocket.txt`, and ZXing's QR code library, under the Apache License 2.0 in
-`licenses/ZXing.txt`.
+Slickrock Station and Tyle are my own apps and aren't open source. Paigr and Paigr Relay are open source under the
+Apache License 2.0, at [Bradleyw801/paigr](https://github.com/Bradleyw801/paigr). Both include Java-WebSocket (MIT,
+`licenses/Java-WebSocket.txt`) and ZXing (Apache 2.0, `licenses/ZXing.txt`). RetroArch is GPL-3.0, and my changes to
+the build served here are in `source/`.

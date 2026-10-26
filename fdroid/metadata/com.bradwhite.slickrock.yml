@@ -4,24 +4,24 @@ License: Proprietary
 AuthorName: Brad White
 WebSite: https://slickrock--bradwhite.apps.hedyassist.com/
 Name: Slickrock Station
-Summary: Retro game launcher that sets up RetroArch for keys, controllers and touch
+Summary: Game launcher that sets up RetroArch for you
 Description: |
-  Slickrock Station sets up RetroArch for you: cores, controls, overlays and
-  settings for each system, with a picture of the real controller while you map
-  it. It is built for keyboard phones such as the Unihertz Titan 2 Elite, phones
-  with built-in controls such as the Sidephone SP-01, Android TV with a gamepad,
-  and plain touchscreen phones.
+  Slickrock Station does the RetroArch setup for you. It installs the cores,
+  sets up the controls, overlays and settings for each system, and shows a
+  picture of the controller you're holding while you map it. Then you just
+  pick a game and play.
 
-  * A game library grouped by system, with box art and type-to-search
-  * Controls drawn on the controller in your hands: a phone's keys or keypad
-    tile, a gamepad, or the touchscreen
-  * One complete RetroArch setup written per system, so each console gets its
-    own layout, overlay and core options
-  * Autosave on exit, with resume or start over when you come back
+  I made it for phones with physical keys, Android devices with a controller
+  connected, and touchscreens.
 
-  Install "RetroArch for Slickrock" from this repository as well. Slickrock
-  Station launches it, and it keeps its settings apart from any other
-  RetroArch on the device.
+  Your games are sorted by system with box art, and you can type to search.
+  Each system gets its own layout, overlay and core settings. When you leave
+  a game it saves your place, and when you come back you can pick up where
+  you left off or start over.
+
+  Install RetroArch for Slickrock from this repository too. That's the
+  RetroArch build Slickrock Station runs, and it keeps its settings separate
+  from any other RetroArch on your device.
 
 RequiresRoot: false
 

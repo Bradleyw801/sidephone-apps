@@ -4,22 +4,26 @@ License: Proprietary
 AuthorName: Brad White
 WebSite: https://bradleyw801.github.io/sidephone-apps/
 Name: Tyle
-Summary: Per-tile settings for the Sidephone SP-01 keypad tiles
+Summary: Switches your Sidephone's settings when you swap keypad tiles
 Description: |
-  Snap a keypad tile on and Tyle switches the phone to the setup you chose
-  for that tile:
+  I built Tyle because I wanted my Sidephone set up differently for each
+  keypad tile. Snap a tile on and Tyle switches the phone to the setup you
+  picked for it.
 
-  * Keyboard: any installed keyboard (TT9 for the number pads, SideType or
-    JakeType for the Compact QWERTY, and so on)
-  * Bluetooth on or off
-  * Screen brightness: auto, or 25, 50, 75 or 100 percent
-  * Open an app: a game when the Mini Controller goes on, a music player for
-    the Sundial
+  For each tile you can choose the keyboard (TT9 for the number pads,
+  SideType or JakeType for the Compact QWERTY), turn Bluetooth on or off,
+  set the brightness, and open an app. Like a game when the Mini Controller
+  goes on, or a music player for the Sundial.
 
-  Each tile's screen shows a picture of its keys with what they do; tap a key
-  to change it. Everything runs inside Tyle's accessibility service, with no
-  root, no Shizuku and no notification. After installing, turn on "Tyle keys"
-  under Settings, Accessibility.
+  Each tile also gets a picture of its keys showing what they do. Tap a key
+  to change it, or give it something to do when you hold it.
+
+  Tyle tells which tile is on from the keys you press. The bottom-left key
+  of each tile is a safe one to press first.
+
+  It all runs inside Tyle's accessibility service. No root, no Shizuku and
+  no notification. After you install it, turn on "Tyle keys" under Settings,
+  Accessibility.
 
 RequiresRoot: false
 
