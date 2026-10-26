@@ -32,6 +32,7 @@ if (-not $TokenFile) { $TokenFile = Join-Path (Join-Path $env:LOCALAPPDATA 'Side
 # A source with Patch = $true goes out with the .patch of the same name (for GPL apps).
 $Sources = @(
     @{ App = 'Tyle'; Package = 'app.tileshift'; Dir = @('Personal', 'Devices', 'Sidephone'); Pattern = 'Tyle-*.apk' }
+    @{ App = 'Twyn'; Package = 'com.bradwhite.twyn'; Dir = @('Personal', 'Devices', 'Sidephone'); Pattern = 'Twyn-*.apk' }
 )
 
 $TokenPage = 'https://github.com/settings/personal-access-tokens/new' +

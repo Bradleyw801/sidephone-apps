@@ -17,11 +17,12 @@ The install page has the QR code: https://bradleyw801.github.io/sidephone-apps/
 | Slickrock Station | `com.bradwhite.slickrock` | A game launcher that sets up RetroArch for you, for physical keys, a controller or a touchscreen |
 | RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | The RetroArch build Slickrock Station runs, with a few input patches |
 | Tyle | `app.tileshift` | Different settings for each of the Sidephone's keypad tiles |
+| Twyn | `com.bradwhite.twyn` | A predictive keyboard for the Sidephone's Compact QWERTY tile |
 | Paigr Relay | `com.textrelay.relay` | Sends the texts from the phone with your SIM to your Paigr inbox |
 | Paigr | `com.textrelay.texts` | Reads and answers those texts on another phone |
 
 If you'd rather skip F-Droid, each app's current build is also at a fixed address: `slickrock.apk`, `retroarch.apk`,
-`tileshift.apk`, `relay.apk` and `texts.apk` under https://bradleyw801.github.io/sidephone-apps/. A `.json` file with
+`tileshift.apk`, `twyn.apk`, `relay.apk` and `texts.apk` under https://bradleyw801.github.io/sidephone-apps/. A `.json` file with
 the same name has the version.
 
 ## Publishing a new version
@@ -31,7 +32,7 @@ Slickrock Station and RetroArch for Slickrock come from
 `slickrock-<version>` or `retroarch-<version>`, with a `versionCode: N` line in the notes. The workflow looks for new
 releases every hour. For RetroArch it takes the arm64-v8a APK and copies the release's `.patch` into `source/`.
 
-Tyle, Paigr and Paigr Relay go in `fdroid/incoming/`, either with `git push` or with "Add file, Upload files" on
+Tyle, Twyn, Paigr and Paigr Relay go in `fdroid/incoming/`, either with `git push` or with "Add file, Upload files" on
 GitHub. GitHub's web upload takes files up to 25 MB. A bigger file can go in as pieces and the workflow puts them back
 together:
 
@@ -82,7 +83,9 @@ tools/publish-to-app-pack.ps1     the script it runs
 
 ## Licences
 
-Slickrock Station and Tyle are my own apps and aren't open source. Paigr and Paigr Relay are open source under the
+Slickrock Station, Tyle and Twyn are my own apps and aren't open source. Twyn's English word data comes from the
+Leipzig Corpora Collection (CC BY 4.0), Traditional T9's word list (Apache 2.0, built on SCOWL) and the UCI SMS Spam
+Collection (CC BY 4.0); the notices are in the app. Paigr and Paigr Relay are open source under the
 Apache License 2.0, at [Bradleyw801/paigr](https://github.com/Bradleyw801/paigr). Both include Java-WebSocket (MIT,
 `licenses/Java-WebSocket.txt`) and ZXing (Apache 2.0, `licenses/ZXing.txt`). RetroArch is GPL-3.0, and my changes to
 the build served here are in `source/`.

@@ -1,0 +1,36 @@
+Categories:
+  - System
+License: Proprietary
+AuthorName: Brad White
+WebSite: https://bradleyw801.github.io/sidephone-apps/
+Name: Twyn
+Summary: A predictive keyboard for the Sidephone's Compact QWERTY tile
+Description: |
+  I built Twyn because the keyboards for the Compact QWERTY tile kept
+  guessing wrong. Each key on the tile has two letters. Press each key
+  once and the word you meant is already in the field by the time you
+  finish it. Space keeps it.
+
+  Twyn picks the word from what you wrote before it, so "see you there"
+  and "they are there" both come out right. If it picks the other word,
+  press the up-down key until it is right. The keys you pressed are
+  always honoured, so a name or a word it doesn't know is built letter by
+  letter without switching modes, and it learns the word for next time.
+
+  There are no on-screen keys. One strip at the bottom shows the word in
+  the middle and the next two readings beside it. It suggests the next
+  word after Space, puts an emoji on the strip when a word has one, and
+  learns the words and phrases you use.
+
+  Space twice makes a period. Shift makes a capital, twice for caps lock.
+  SYM then a key types what is printed above it. Hold a letter key for
+  its number. Shift then SYM opens the emoji panel. Hold Space for the
+  settings.
+
+  After you install it, turn it on under Settings, System, Languages and
+  input, and pick it for the Compact QWERTY tile in Tyle.
+
+RequiresRoot: false
+
+# Only builds signed with this key are published (SHA-256 of the signing certificate).
+AllowedAPKSigningKeys: 58bb11db65b2fcf1393f13cbd7bf39002f7987b1f846c5fc1fbc740da8140d69
