@@ -4,12 +4,17 @@ License: Proprietary
 AuthorName: Brad White
 WebSite: https://bradleyw801.github.io/sidephone-apps/
 Name: Twyn
-Summary: A predictive keyboard for the Sidephone's Compact QWERTY tile
+Summary: A predictive keyboard for the Sidephone's Compact QWERTY tile and the Titan 2
 Description: |
   I built Twyn because the keyboards for the Compact QWERTY tile kept
   guessing wrong. Each key has two letters. Press each key once and the
   word you meant is in the field by the time you finish it. Space keeps
   it. If it picked the other word, press the up-down key.
+
+  On a Titan 2 it works the same way with the full keyboard: what you
+  type stays as typed, the strip offers the word, a correction or the
+  rest of it, and Space takes the one in the middle. Alt types what is
+  printed on the keys.
 
   It picks words from what you wrote before, learns your words and
   suggests the next one. Open it once after installing to turn it on.
