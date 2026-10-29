@@ -10,12 +10,15 @@ Description: |
   guessing wrong. Each key has two letters. Press each key once and the
   word you meant is in the field by the time you finish it. Space keeps
   it. If it picked the other word, hold the up-down key or tap the one
-  you want. A tap of the up-down key switches to ABC or 123.
+  you want. A tap of the up-down key switches to ABC, 123 or Touch,
+  which puts keys on the screen, with swipe typing, for when another
+  tile is on.
 
   On a Titan 2 it works the same way with the full keyboard: what you
   type stays as typed, the strip offers the word, a correction or the
-  rest of it, and Space takes the one in the middle. Alt switches to ABC
-  or 123, and Alt with a key types what is printed on it.
+  rest of it, and Space takes the one in the middle. Alt switches to ABC,
+  123 or Touch. Hold a key, or press Alt with it, for what is printed on
+  it.
 
   It picks words from what you wrote before, learns your words and
   suggests the next one. Open it once after installing to turn it on.
