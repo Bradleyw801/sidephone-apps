@@ -4,13 +4,15 @@ License: Proprietary
 AuthorName: Brad White
 WebSite: https://bradleyw801.github.io/sidephone-apps/
 Name: Twyn Keyboard
-Summary: A predictive keyboard for phones with real keys
+Summary: A predictive keyboard for any device, built for real keys and small screens
 Description: |
-  I built Twyn Keyboard because the keyboards for phones with real keys
-  kept guessing wrong. On a keypad with two letters on each key, press
-  each key once and the word you meant is in the field by the time you
-  finish it. Space keeps it. If it picked the other word, tap the one you
-  want.
+  Twyn Keyboard is a predictive keyboard for any Android device. I built
+  it for phones with real keys, small screens and other unusual phones,
+  and it works just as well with keys on the screen.
+
+  On a keypad with two letters on each key, press each key once and the
+  word you meant is in the field by the time you finish it. Space keeps
+  it. If it picked the other word, tap the one you want.
 
   On a full keyboard, what you type stays as typed. The strip offers the
   word, a correction or the rest of it, and Space takes the one in the
