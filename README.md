@@ -18,8 +18,8 @@ The install page has the QR code: https://bradleyw801.github.io/sidephone-apps/
 | RetroArch for Slickrock | `com.bradwhite.slickrock.retroarch` | The RetroArch build Slickrock Station runs, with a few input patches |
 | Tyle | `app.tileshift` | Different settings for each of the Sidephone's keypad tiles |
 | Twyn Keyboard | `com.bradwhite.twyn` | A predictive keyboard for phones with real keys, with on-screen keys when there are none |
-| Paigr Relay | `com.textrelay.relay` | Sends the texts from the phone with your SIM to your Paigr inbox |
-| Paigr | `com.textrelay.texts` | Reads and answers those texts on another phone |
+| Paigr Relay | `com.textrelay.relay` | Beta. Sends the texts from the phone with your SIM to your Paigr inbox |
+| Paigr | `com.textrelay.texts` | Beta. Reads and answers those texts on another phone |
 
 If you'd rather skip F-Droid, each app's current build is also at a fixed address: `slickrock.apk`, `retroarch.apk`,
 `tileshift.apk`, `twyn.apk`, `relay.apk` and `texts.apk` under https://bradleyw801.github.io/sidephone-apps/. A `.json` file with

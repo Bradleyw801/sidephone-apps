@@ -6,8 +6,10 @@ WebSite: https://bradleyw801.github.io/sidephone-apps/
 SourceCode: https://github.com/Bradleyw801/Paigr
 IssueTracker: https://github.com/Bradleyw801/Paigr/issues
 Name: Paigr Relay
-Summary: Sends this phone's texts, RCS included, to Paigr on your other phone
+Summary: "Beta: sends this phone's texts, RCS included, to Paigr on your other phone"
 Description: |
+  Paigr Relay is in beta, so expect some rough edges.
+
   Paigr Relay goes on the phone that has your SIM and Google Messages. Every
   text that phone gets goes to your inbox, where Paigr on your other phone
   shows it. That's SMS, MMS and RCS, one-to-one and group chats, with names

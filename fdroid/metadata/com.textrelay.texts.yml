@@ -6,8 +6,10 @@ WebSite: https://bradleyw801.github.io/sidephone-apps/
 SourceCode: https://github.com/Bradleyw801/Paigr
 IssueTracker: https://github.com/Bradleyw801/Paigr/issues
 Name: Paigr
-Summary: Read and answer your texts, RCS included, on any Android phone
+Summary: "Beta: read and answer your texts, RCS included, on any Android phone"
 Description: |
+  Paigr is in beta, so expect some rough edges.
+
   Paigr is where you read and answer your texts. It runs on the phone you
   carry, which can be any Android phone, even one with no Google services.
   Paigr Relay, on the phone with your SIM, sends it every conversation,
