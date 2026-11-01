@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Brad White's apps</title>
-<meta name="description" content="Brad White's Android apps in one F-Droid repository: Slickrock Station, RetroArch for Slickrock, Tyle, Twyn Keyboard, Paigr and Paigr Relay.">
+<title>Brad White's Sidephone apps</title>
+<meta name="description" content="Brad White's apps for the Sidephone in one F-Droid repository: Tyle, which gives each keypad tile its own setup.">
 <link rel="icon" href="repo/icons/icon.png">
 <style>
   :root {
@@ -46,8 +46,8 @@
 </head>
 <body>
 <main>
-  <h1>Brad White's apps</h1>
-  <p class="sub">These are the Android apps I have built. Add this repository to F-Droid once and you can install all of them and get their updates from there.</p>
+  <h1>Brad White's Sidephone apps</h1>
+  <p class="sub">The apps I have built for the Sidephone. Add this repository to App Library or F-Droid once and you can install them and get their updates from there. My other apps, Slickrock Station, Twyn Keyboard, Paigr and Paigr Relay, are in <a href="https://bradleyw801.github.io/apps/">Brad White's apps</a>.</p>
 
   <figure class="qr" style="margin:0">
     <img src="qr.png" width="636" height="636" alt="QR code that adds this repository to an F-Droid client">
@@ -70,18 +70,6 @@
 
   <h2>The apps</h2>
   <ul class="apps">
-    <li class="app" data-pkg="com.bradwhite.slickrock">
-      <img src="repo/com.bradwhite.slickrock/en-US/icon.png" alt="">
-      <div><strong>Slickrock Station</strong><span class="v"></span>
-      <p>A game launcher that sets up RetroArch for you, so you can pick a game and play. I made it for phones with physical keys, Android devices with a controller connected, and touchscreens.</p>
-      <a class="dl" href="slickrock.apk">Download the APK</a></div>
-    </li>
-    <li class="app" data-pkg="com.bradwhite.slickrock.retroarch">
-      <img src="repo/com.bradwhite.slickrock.retroarch/en-US/icon.png" alt="">
-      <div><strong>RetroArch for Slickrock</strong><span class="v"></span>
-      <p>The RetroArch build Slickrock Station runs. I patched its input so quick presses always register, and it installs next to regular RetroArch without touching its settings. RetroArch is GPL, so my <a href="https://github.com/Bradleyw801/sidephone-apps/tree/main/source">patches</a> are published here.</p>
-      <a class="dl" href="retroarch.apk">Download the APK</a></div>
-    </li>
     <li class="app" data-pkg="app.tileshift">
       <img src="repo/app.tileshift/en-US/icon.png" alt="">
       <div><strong>Tyle</strong><span class="v"></span>
@@ -89,32 +77,11 @@
       <p>Gives each keypad tile its own setup. Snap a tile on and Tyle switches the keyboard, Bluetooth and brightness, and can open an app for it. After you install it, turn on "Tyle keys" in Accessibility settings.</p>
       <a class="dl" href="tileshift.apk">Download the APK</a></div>
     </li>
-    <li class="app" data-pkg="com.bradwhite.twyn">
-      <img src="repo/com.bradwhite.twyn/en-US/icon.png" alt="">
-      <div><strong>Twyn Keyboard</strong><span class="v"></span>
-      <span class="where">For any device</span>
-      <p>Built for phones with real keys, small screens and other unusual phones. On a keypad, two letters a key or a T9 phone's 2 to 9, press each key once and the word you meant is there when you finish it. It learns your words and suggests the next one, and when there are no keys to type on it puts keys on the screen: a compact or full QWERTY with swipe typing, or a T9 keypad. Open it once after installing and it walks you through turning it on.</p>
-      <a class="dl" href="twyn.apk">Download the APK</a></div>
-    </li>
-    <li class="app" data-pkg="com.textrelay.relay">
-      <img src="repo/com.textrelay.relay/en-US/icon.png" alt="">
-      <div><strong>Paigr Relay</strong><span class="beta">Beta</span><span class="v"></span>
-      <span class="where">On the phone with your SIM</span>
-      <p>Sends every text that phone gets, including RCS, group chats and pictures, to your Paigr inbox. Your replies go back out from your number. Keep it on Wi-Fi and plugged in.</p>
-      <a class="dl" href="relay.apk">Download the APK</a></div>
-    </li>
-    <li class="app" data-pkg="com.textrelay.texts">
-      <img src="repo/com.textrelay.texts/en-US/icon.png" alt="">
-      <div><strong>Paigr</strong><span class="beta">Beta</span><span class="v"></span>
-      <span class="where">On the phone you carry</span>
-      <p>Read and answer your texts on any Android phone, even one without Google services. You get a notification for each conversation, and you can react, quote a message and send pictures and files.</p>
-      <a class="dl" href="texts.apk">Download the APK</a></div>
-    </li>
   </ul>
-  <p class="note" style="margin-top:12px">To set up Paigr, open Paigr Relay on the phone with your SIM and it shows a code. Tap <strong>Scan code</strong> in Paigr on your other phone and scan it. That's it! There's no account or password, and your texts are encrypted on the phones, so the server can't read them. Both apps can connect through Tor with Orbot, and you can run the inbox server yourself. The source is at <a href="https://github.com/Bradleyw801/Paigr">github.com/Bradleyw801/Paigr</a>. To add another phone or a browser, tap <strong>Link a device</strong> in Paigr Relay.</p>
+  <p class="note" style="margin-top:12px">Looking for Slickrock Station, RetroArch for Slickrock, Twyn Keyboard, Paigr or Paigr Relay? They moved to <a href="https://bradleyw801.github.io/apps/">Brad White's apps</a>. Add that repository the same way and your updates carry on from there.</p>
   <p class="note">The direct downloads are the same builds F-Droid gets. Android asks once to allow installs from your browser. On phones with Google Play, Play Protect may ask too. Tap <strong>More details</strong>, then <strong>Install anyway</strong>.</p>
 
-  <p class="note" style="margin-top:28px">Published from <a href="https://github.com/Bradleyw801/sidephone-apps">github.com/Bradleyw801/sidephone-apps</a>. RetroArch is free software under the GNU GPL, and the changes in the build served here are published with it.</p>
+  <p class="note" style="margin-top:28px">Published from <a href="https://github.com/Bradleyw801/sidephone-apps">github.com/Bradleyw801/sidephone-apps</a>.</p>
 </main>
 <script>
   fetch('repo/index-v2.json').then(r => r.json()).then(d => {

@@ -1,15 +1,15 @@
 ---
-# Brad White's apps: an F-Droid-format repository served from GitHub Pages.
+# Brad White's Sidephone apps: an F-Droid-format repository served from GitHub Pages.
 # Secrets never live in this file. The index-signing keystore is restored from the
 # FDROID_KEYSTORE_B64 GitHub secret at build time and the passwords come from the
 # FDROID_KEYSTORE_PASS / FDROID_KEY_PASS secrets.
 
 repo_url: https://bradleyw801.github.io/sidephone-apps/repo
-repo_name: Brad White's apps
+repo_name: Brad White's Sidephone apps
 repo_description: >-
-  The Android apps I have built: Slickrock Station and its RetroArch build, Tyle,
-  Twyn Keyboard, and Paigr and Paigr Relay for reading your texts on another phone.
-  Install them from here and their updates come through the same way.
+  Tyle, which gives each of the Sidephone's keypad tiles its own setup. Install it from
+  here and its updates come through the same way. My other apps are in Brad White's apps,
+  at https://bradleyw801.github.io/apps/
 repo_icon: icon.png
 
 # No archive repo: the newest version of each app is what gets served.

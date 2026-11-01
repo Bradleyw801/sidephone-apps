@@ -1,7 +1,6 @@
-# Sends new Tyle builds to Brad White's apps (github.com/Bradleyw801/sidephone-apps).
-# Start it with PUBLISH-TO-APP-PACK.cmd. Slickrock Station and RetroArch for Slickrock are
-# not sent from here: the repository's workflow takes them from their GitHub releases
-# (github.com/Bradleyw801/slickrock-releases).
+# Sends new Tyle builds to Brad White's Sidephone apps (github.com/Bradleyw801/sidephone-apps).
+# Start it with PUBLISH-TO-APP-PACK.cmd. Brad's other apps are published from
+# github.com/Bradleyw801/apps, not from here.
 #
 # It finds the newest APK of each app in its usual Downloads folder, skips anything the
 # pack already serves, asks before sending each new one, and waits until the pack has
@@ -32,7 +31,6 @@ if (-not $TokenFile) { $TokenFile = Join-Path (Join-Path $env:LOCALAPPDATA 'Side
 # A source with Patch = $true goes out with the .patch of the same name (for GPL apps).
 $Sources = @(
     @{ App = 'Tyle'; Package = 'app.tileshift'; Dir = @('Personal', 'Devices', 'Sidephone'); Pattern = 'Tyle-*.apk' }
-    @{ App = 'Twyn'; Package = 'com.bradwhite.twyn'; Dir = @('Personal', 'Devices', 'Sidephone'); Pattern = 'Twyn-*.apk' }
 )
 
 $TokenPage = 'https://github.com/settings/personal-access-tokens/new' +
