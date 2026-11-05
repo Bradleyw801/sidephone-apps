@@ -16,10 +16,14 @@ Description: |
   goes on, or a music player for the Sundial.
 
   Each tile also gets a picture of its keys showing what they do. Tap a key
-  to change it, or give it something to do when you hold it.
+  to change it, or give it something to do when you hold it. The Sundial
+  and the Mini Controller have a Navigation preset, so you can get around
+  the phone with their keys alone: Enter, Back, Home, Recent apps, Long
+  press and the notifications.
 
-  Tyle tells which tile is on from the keys you press. The bottom-left key
-  of each tile is a safe one to press first.
+  When the phone's firmware names its tiles, Tyle knows a tile the moment
+  it snaps on. When it doesn't, Tyle tells from the keys you press, and the
+  bottom-left key of each tile is a safe one to press first.
 
   It all runs inside Tyle's accessibility service. No root, no Shizuku and
   no notification. After you install it, turn on "Tyle keys" under Settings,
